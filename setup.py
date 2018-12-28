@@ -13,5 +13,5 @@ setup(name='deep_learning_projects',
       author='Guy Davidson',
       author_email='guy@minerva.kgi.edu',
       license='N/A',
-      packages=find_packages(),
+      packages=find_packages(exclude=['contrib', 'docs', 'tests', 'notebooks']),
       install_requires=requirements)

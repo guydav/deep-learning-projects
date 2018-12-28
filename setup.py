@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 
 requirements = list(filter(lambda s: not s.startswith('-e'), requirements))
 
-setup(name='deep_learning_projects',
+setup(name='projects',
       version='0.1',
       description="Guy Davidson's DL projects",
       url='https://github.com/guydav/deep-learning-projects',

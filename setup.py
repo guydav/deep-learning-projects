@@ -1,7 +1,10 @@
 from setuptools import setup
 
+
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
+
+requirements = list(filter(lambda s: not s.startswith('-e'), requirements))
 
 setup(name='deep_learning_projects',
       version='0.1',
@@ -11,5 +14,4 @@ setup(name='deep_learning_projects',
       author_email='guy@minerva.kgi.edu',
       license='N/A',
       packages=['projects'],
-      install_requires=requirements,
-      zip_safe=True)
+      install_requires=requirements)

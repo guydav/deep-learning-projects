@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 with open('requirements.txt') as f:
@@ -13,5 +13,5 @@ setup(name='deep_learning_projects',
       author='Guy Davidson',
       author_email='guy@minerva.kgi.edu',
       license='N/A',
-      packages=['projects'],
+      packages=find_packages(),
       install_requires=requirements)

@@ -101,7 +101,7 @@ def analyze_results(test_results, k=5):
 
 def plot_reconstruction(model, im, n_images=8, image_scale=1.5):
     with torch.no_grad():
-        tensor_im = torch.Tensor(im, dtype=torch.float).to(device)
+        tensor_im = torch.tensor(im, dtype=torch.float).to(device)
         recon_im, mu, logvar = model(tensor_im)
 
     fig = plt.figure(figsize=(n_images * image_scale, 2 * (image_scale + 0.5)))

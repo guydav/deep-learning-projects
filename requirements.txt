@@ -1,6 +1,9 @@
+matplotlib
+pyro-ppl
+scipy
+sklearn
 torch
 torchvision
 torchsummary
-pyro-ppl
 wandb
 -e git+https://github.com/chengs/tqdm.git@colab#egg=tqdm

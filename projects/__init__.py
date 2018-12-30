@@ -3,3 +3,4 @@
 
 from . import metalearning
 from . import vae_abc
+from . import dendrogram

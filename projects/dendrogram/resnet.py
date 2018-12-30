@@ -7,7 +7,7 @@ https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 """
 
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 
 class BasicBlock(nn.Module):
@@ -122,4 +122,4 @@ class ResnetWrapper(BasicModel, ResNet):
 def create_resnet18(name, **kwargs):
     # Stolen from torchvision.models.resnet, using my wrapper
     return ResnetWrapper(name, BasicBlock, [2, 2, 2, 2], **kwargs)
-     
+

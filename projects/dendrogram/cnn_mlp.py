@@ -1,7 +1,7 @@
 from .base_model import BasicModel, DEFAULT_SAVE_DIR
 
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 import torch.optim as optim
 
 

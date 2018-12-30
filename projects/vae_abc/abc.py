@@ -101,7 +101,7 @@ def analyze_results(test_results, k=5):
 
 def plot_reconstruction(model, im, n_images=8, image_scale=1.5):
     with torch.no_grad():
-        tensor_im = torch.tensor(im, dtype=torch.float).to(device)
+        tensor_im = torch.Tensor(im, dtype=torch.float).to(device)
         recon_im, mu, logvar = model(tensor_im)
 
     fig = plt.figure(figsize=(n_images * image_scale, 2 * (image_scale + 0.5)))
@@ -109,9 +109,12 @@ def plot_reconstruction(model, im, n_images=8, image_scale=1.5):
     nrows = 2
     ncols = n_images
 
+    if type(recon_im) == torch.Tensor:
+        recon_im = recon_im.cpu().numpy()
+
     for i in range(ncols):
         ax = plt.subplot(nrows, ncols, i + 1)
         ax.imshow(im[i].reshape(28, 28))
 
-        ax_recon = ax = plt.subplot(nrows, ncols, ncols + i + 1)
-        ax.imshow(recon_im[i].reshape(28, 28))
+        ax_recon = plt.subplot(nrows, ncols, ncols + i + 1)
+        ax_recon.imshow(recon_im[i].reshape(28, 28))

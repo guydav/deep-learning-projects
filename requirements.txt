@@ -1,4 +1,5 @@
 matplotlib
+Pillow==4.0.0
 pyro-ppl
 scipy
 sklearn

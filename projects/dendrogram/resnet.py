@@ -103,7 +103,8 @@ class ResnetWrapper(BasicModel, ResNet):
     def __init__(self, name, block, layers, num_classes=10,
                  lr=1e-4, weight_decay=0):
         ResNet.__init__(self, block, layers, num_classes)
-        BasicModel.__init__(self, name, should_super_init=False, num_classes=num_classes)
+        BasicModel.__init__(self, name, should_super_init=False, num_classes=num_classes,
+                            loss=nn.CrossEntropyLoss())
 
         self.lr = lr
         self.weight_decay = weight_decay

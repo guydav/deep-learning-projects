@@ -132,13 +132,10 @@ class DigitMixerDataset(Dataset):
         return self.epoch_length
 
 
-MNIST_TRAIN_END = 60000
-sk_mnist = sk_datasets.fetch_mldata('MNIST original')
-
-train_data = sk_mnist.data[:MNIST_TRAIN_END]
-train_target = sk_mnist.target[:MNIST_TRAIN_END]
-test_data = sk_mnist.data[MNIST_TRAIN_END:]
-test_target = sk_mnist.target[MNIST_TRAIN_END:]
+train_data = SKLEARN_MNIST.data[:MNIST_TRAIN_END]
+train_target = SKLEARN_MNIST.target[:MNIST_TRAIN_END]
+test_data = SKLEARN_MNIST.data[MNIST_TRAIN_END:]
+test_target = SKLEARN_MNIST.target[MNIST_TRAIN_END:]
 
 mixed_digit_train_dataset = DigitMixerDataset(train_data, train_target)
 mixed_digit_train_loader = torch.utils.data.DataLoader(mixed_digit_train_dataset,

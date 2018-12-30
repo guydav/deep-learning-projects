@@ -44,6 +44,7 @@ class TorchDigitMixer:
         return images
 
 
+SKLEARN_MNIST = sk_datasets.fetch_mldata('MNIST original')
 MNIST_TRAIN_END = 60000
 
 
@@ -52,7 +53,7 @@ class SklearnDigitMixer:
         self.digits = digits
         self.weights = np.array(weights)
 
-        self.mnist = sk_datasets.fetch_mldata('MNIST original')
+        self.mnist = SKLEARN_MNIST
         self.train_data = self.mnist.data[:MNIST_TRAIN_END]
         self.train_indices = self._digit_indices(self.mnist.target[:MNIST_TRAIN_END])
 

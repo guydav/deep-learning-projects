@@ -37,7 +37,7 @@ class DendrogramLoss(nn.Module):
 
     def _dendrogram_to_distances(self):
         all_distances = dict(nx.floyd_warshall(self.dendrogram))
-        num_classes = len(self.actual_classes)
+        num_classes = len(self.classes)
         distances = np.zeros((num_classes, num_classes))
 
         for i, j in combinations_with_replacement(np.arange(num_classes), 2):

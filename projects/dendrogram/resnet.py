@@ -6,8 +6,11 @@ Trying an alternative ResNet implementation from https://github.com/kuangliu/pyt
 https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 """
 
+from .base_model import BasicModel
+
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 
 class BasicBlock(nn.Module):
@@ -96,9 +99,6 @@ class ResNet(nn.Module):
         return out
 
 
-from torchvision.models import resnet
-
-
 class ResnetWrapper(BasicModel, ResNet):
     def __init__(self, name, block, layers, num_classes=10,
                  lr=1e-4, weight_decay=0):
@@ -115,11 +115,9 @@ class ResnetWrapper(BasicModel, ResNet):
                                                               factor=0.5, patience=10, verbose=True)
 
     def post_test(self, test_loss):
-        epoch = len(self.test_losses)
         self.scheduler.step(test_loss)
 
 
 def create_resnet18(name, **kwargs):
     # Stolen from torchvision.models.resnet, using my wrapper
     return ResnetWrapper(name, BasicBlock, [2, 2, 2, 2], **kwargs)
-

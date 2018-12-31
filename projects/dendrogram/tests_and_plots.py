@@ -99,6 +99,12 @@ def plot_model_results(models, model_labels, results_key, results_name=None, fig
         x_range = np.arange(1, max_epoch + 1)
 
     for i, model in enumerate(models):
+        if len(model.results.keys()) == 0:
+            load_epoch = max_epoch
+            if model_specific_limits is not None and model.name in model_specific_limits:
+                load_epoch = model_specific_limits[model.name]
+            model.load_model(load_epoch)
+
         model_results = model.results[results_key]
         if result_extractor is not None:
             if result_extractor_params is None:

@@ -1,4 +1,4 @@
-from .cnn_mlp import PoolingDropoutCNN_MLP
+from .cnn_model import DendrogramPoolingDropoutCNNMLP
 from .dendrogram import DendrogramLoss, HingeDendrogramLoss, HingeDendrogramMarginLoss, \
                         DEFAULT_CLASSES, DEFAULT_EDGE_DICTS, ALPHABETICAL_EDGE_DICTS
 
@@ -16,7 +16,7 @@ def load_relevant_models():
         if loss is not None:
             loss = loss.cuda()
 
-        model = PoolingDropoutCNN_MLP(
+        model = DendrogramPoolingDropoutCNNMLP(
             conv_filter_sizes=(16, 32, 48, 64),
             conv_output_size=256,
             mlp_layer_sizes=(512, 512, 512, 512),

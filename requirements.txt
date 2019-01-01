@@ -1,4 +1,5 @@
 matplotlib
+numpy
 Pillow==4.0.0
 pyro-ppl
 scipy

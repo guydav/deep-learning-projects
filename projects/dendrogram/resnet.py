@@ -6,7 +6,8 @@ Trying an alternative ResNet implementation from https://github.com/kuangliu/pyt
 https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 """
 
-from .base_model import BasicModel
+from ..metalearning.base_model import BasicModel
+from .cnn_model import NUM_CIFAR_10_CLASSES
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -100,10 +101,11 @@ class ResNet(nn.Module):
 
 
 class ResnetWrapper(BasicModel, ResNet):
-    def __init__(self, name, block, layers, num_classes=10,
+    def __init__(self, name, block, layers, num_classes=NUM_CIFAR_10_CLASSES,
                  lr=1e-4, weight_decay=0):
         ResNet.__init__(self, block, layers, num_classes)
         BasicModel.__init__(self, name, should_super_init=False, num_classes=num_classes,
+                            compute_correct_rank=True,
                             loss=nn.CrossEntropyLoss())
 
         self.lr = lr

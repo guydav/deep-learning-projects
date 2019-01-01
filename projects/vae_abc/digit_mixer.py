@@ -51,7 +51,7 @@ MNIST_TRAIN_END = 60000
 class SklearnDigitMixer:
     def __init__(self, digits, weights, noise_std=0):
         self.digits = digits
-        self.weights = np.array(weights)
+        self.weights = np.squeeze(np.array(weights))
 
         self.mnist = SKLEARN_MNIST
         self.train_data = self.mnist.data[:MNIST_TRAIN_END]

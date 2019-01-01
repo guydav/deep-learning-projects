@@ -1,8 +1,9 @@
+from .vae import BATCH_SIZE, kwargs
+
 from sklearn import datasets as sk_datasets
 from torchvision import datasets, transforms
 import numpy as np
 import torch
-from .vae import BATCH_SIZE, kwargs
 
 
 class TorchDigitMixer:

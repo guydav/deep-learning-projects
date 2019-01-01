@@ -1,10 +1,12 @@
+from .digit_mixer import SklearnDigitMixer
+from .abc import default_encoder
+
 from scipy.special import logit, expit
 import numpy as np
 import tqdm
 import torch
 
-from .digit_mixer import SklearnDigitMixer
-from .abc import default_encoder
+
 
 DEFAULT_H = 0.5
 DEFAULT_EPSILON = 1e-10

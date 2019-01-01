@@ -178,29 +178,38 @@ class SmallerDropoutFCOutputModel(nn.Module):
 #             return F.softmax(x, dim=1)
 
 
-class PoolingDropoutCNN_MLP(BasicModel):
+class PoolingDropoutCNNMLP(BasicModel):
     def __init__(self, query_length=21, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),
                  mlp_dropout=True, mlp_p_dropout=0.5,
-                 conv_output_size=1920, lr=1e-4, weight_decay=0, use_mse=False,
+                 conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
+                 use_mse=False, loss=None, compute_correct_rank=False,
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
-        super(PoolingDropoutCNN_MLP, self).__init__(name, use_mse, save_dir)
-
+        super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
+                                                   use_mse=use_mse, loss=loss, compute_correct_rank=compute_correct_rank)
+        
         self.query_length = query_length
         self.conv = PoolingDropoutConvInputModel(conv_filter_sizes,
                                                  conv_dropout,
                                                  conv_p_dropout)
         self.fc1 = nn.Linear(conv_output_size + query_length, mlp_layer_sizes[0])  # query concatenated to all
+        output_size = num_classes
+        
         if use_mse:
-            fc_output_func = lambda x: torch.sigmoid(x)
+            if num_classes == 2:
+                output_size = 1
+                fc_output_func = lambda x: torch.sigmoid(x)
+            else:
+                fc_output_func = lambda x: F.softmax(x, dim=1)
         else:
             fc_output_func = lambda x: F.log_softmax(x, dim=1)
+
         self.fcout = SmallerDropoutFCOutputModel(mlp_layer_sizes,
                                                  mlp_dropout,
                                                  mlp_p_dropout,
                                                  output_func=fc_output_func,
-                                                 output_size=use_mse and 1 or 2)
+                                                 output_size=output_size)
         self.lr = lr
         self.weight_decay = weight_decay
 
@@ -215,13 +224,15 @@ class PoolingDropoutCNN_MLP(BasicModel):
         if epoch > 100:
             self.scheduler.step(test_loss)
 
-    def forward(self, img, query):
+    def forward(self, img, query=None):
 
         x = self.conv(img)  ## x = (16 x 24 x 15 x 20)
         """fully connected layers"""
         x = x.view(x.size(0), -1)
 
-        x_ = torch.cat((x, query), 1)  # Concat query - as a float?
+        x_ = x
+        if self.query_length > 0:
+            x_ = torch.cat((x_, query), 1)  # Concat query - as a float?
 
         x_ = self.fc1(x_)
         x_ = F.relu(x_)

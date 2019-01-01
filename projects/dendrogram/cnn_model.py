@@ -1,4 +1,4 @@
-from ..metalearning.cnn_mlp import PoolingDropoutCNNMLP
+from ..metalearning.cnnmlp import PoolingDropoutCNNMLP
 
 import torch.nn as nn
 import torch.nn.functional as F

@@ -1,4 +1,4 @@
-__all__ = (
+__all__ = [
     '..metalearning.base_model',
     '..metalearning.cnn_mlp',
     'cifar10',
@@ -6,7 +6,7 @@ __all__ = (
     'dendrogram',
     'resnet',
     'tests_and_plots'
-)
+]
 
 from ..metalearning import base_model
 from ..metalearning import cnnmlp

@@ -1,3 +1,9 @@
-from .base_model import *
-from .cnn_mlp import *
-from .dataset import *
+__all__ = (
+    'base_model',
+    'cnnmlp',
+    'dataset'
+)
+
+from . import base_model
+from . import cnnmlp
+from . import dataset

@@ -29,7 +29,7 @@ DEFAULT_MLP_LAYER_SIZES = (256, 64, 16, 4)
 class BasicModel(nn.Module):
     def __init__(self, name, should_super_init=True, use_mse=False,
                  save_dir=DEFAULT_SAVE_DIR, mse_threshold=0.5, num_classes=2,
-                 loss=None, compute_correct_rank=False):
+                 loss=None, use_query=True, compute_correct_rank=False):
         if should_super_init:
             super(BasicModel, self).__init__()
 
@@ -37,6 +37,7 @@ class BasicModel(nn.Module):
         self.use_mse = use_mse
         self.mse_threshold = mse_threshold
         self.num_classes = num_classes
+        self.use_query = use_query
         self.compute_correct_rank = compute_correct_rank
 
         self.multiclass = num_classes != 2
@@ -66,12 +67,12 @@ class BasicModel(nn.Module):
         self.train_correct_rank = []
         self.test_correct_rank = []
 
-    def train_(self, input_img, label):
+    def train_(self, input_img, label, query=None):
         if self.optimizer is None:
             self._create_optimizer()
 
         self.optimizer.zero_grad()
-        output = self(input_img)
+        output = self(input_img, query)
 
         np_labels = label.data.cpu().numpy()
         if self.multiclass:
@@ -127,8 +128,8 @@ class BasicModel(nn.Module):
 
         return results
 
-    def test_(self, input_img, label, training=False):
-        output = self(input_img)
+    def test_(self, input_img, label, query=None):
+        output = self(input_img, query)
 
         np_labels = label.data.cpu().numpy()
         if self.multiclass:
@@ -265,23 +266,35 @@ def train_epoch(model, dataloader, cuda=True,
                 num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
     epoch_results = defaultdict(list)
 
-    for b, (X, y) in enumerate(dataloader):
+    for batch_index, batch in enumerate(dataloader):
+        if model.use_query:
+            X, y, Q = batch
+
+        else:
+            X, y = batch
+            Q = None
+
         if cuda:
             X = X.cuda()
             y = y.cuda()
+            if Q is not None: Q = Q.cuda()
 
         images = Variable(X)
         labels = Variable(y).long()
+        if Q is not None:
+            queries = Variable(Q).float()
+            results = model.train_(images, labels, queries)
+        else:
+            results = model.train_(images, labels)
 
-        results = model.train_(images, labels)
         epoch_results['accuracies'].append(results['accuracy'])
         epoch_results['losses'].append(results['loss'])
         if 'auc' in results and results['auc'] is not None: epoch_results['aucs'].append(results['auc'])
         if model.compute_correct_rank: epoch_results['correct_rank'].extend(results['correct_rank'])
 
-        if (b + 1) % num_batches_to_print == 0:
+        if (batch_index + 1) % num_batches_to_print == 0:
             print(
-                f'{now()}: After batch {b + 1}, average acc is {np.mean(accuracies):.3f} and average loss is {np.mean(losses):.3f}')
+                f'{now()}: After batch {batch_index + 1}, average acc is {np.mean(accuracies):.3f} and average loss is {np.mean(losses):.3f}')
 
     model.results['train_accuracies'].append(np.mean(epoch_results['accuracies']))
     model.results['train_losses'].append(np.mean(epoch_results['losses']))
@@ -294,15 +307,27 @@ def train_epoch(model, dataloader, cuda=True,
 def test(model, dataloader, cuda=True, training=False):
     test_results = defaultdict(list)
 
-    for b, (X, y) in enumerate(dataloader):
+    for batch in dataloader:
+        if model.use_query:
+            X, y, Q = batch
+
+        else:
+            X, y = batch
+            Q = None
+
         if cuda:
             X = X.cuda()
             y = y.cuda()
+            if Q is not None: Q = Q.cuda()
 
         images = Variable(X)
         labels = Variable(y).long()
+        if Q is not None:
+            queries = Variable(Q).float()
+            results = model.test_(images, labels, queries)
+        else:
+            results = model.test_(images, labels)
 
-        results = model.train_(images, labels)
         test_results['accuracies'].append(results['accuracy'])
         test_results['losses'].append(results['loss'])
         if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
@@ -311,7 +336,7 @@ def test(model, dataloader, cuda=True, training=False):
     model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
     mean_loss = np.mean(test_results['losses'])
     model.results['test_losses'].append(mean_loss)
-    model.post_test(mean_loss)
+    if training: model.post_test(mean_loss)
     model.results['test_aucs'].append(np.mean(test_results['aucs']))
     model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
 
@@ -319,13 +344,14 @@ def test(model, dataloader, cuda=True, training=False):
 
 
 def mid_train_plot(model, epochs_to_test):
-    plt.figure(figsize=(16, 4))
+    num_plots = 3 + int(model.compute_correct_rank)
+    plt.figure(figsize=(16, num_plots))
     epoch = len(model.results['train_losses'])
     plt.suptitle(f'After epoch {epoch}')
     train_x_values = np.arange(1, epoch + 1)
-    test_x_values = np.arange(1, len(model['test_losses']) + 1) * epochs_to_test
+    test_x_values = np.arange(1, epoch // epochs_to_test + 1) * epochs_to_test
 
-    loss_ax = plt.subplot(1, 4, 1)
+    loss_ax = plt.subplot(1, num_plots, 1)
     loss_ax.set_title('Loss')
     print(train_x_values, model.results['train_losses'])
     print(test_x_values, model.results['test_losses'])
@@ -333,23 +359,24 @@ def mid_train_plot(model, epochs_to_test):
     loss_ax.plot(test_x_values, model.results['test_losses'], label='Test')
     loss_ax.legend(loc='best')
 
-    acc_ax = plt.subplot(1, 4, 2)
+    acc_ax = plt.subplot(1, num_plots, 2)
     acc_ax.set_title('Accuracy')
     acc_ax.plot(train_x_values, model.results['train_accuracies'], label='Train')
     acc_ax.plot(test_x_values, model.results['test_accuracies'], label='Test')
     acc_ax.legend(loc='best')
 
-    auc_ax = plt.subplot(1, 4, 3)
+    auc_ax = plt.subplot(1, num_plots, 3)
     auc_ax.set_title('AUC')
     auc_ax.plot(train_x_values, model.results['train_aucs'], label='Train')
     auc_ax.plot(test_x_values, model.results['test_aucs'], label='Test')
     auc_ax.legend(loc='best')
 
-    rank_ax = plt.subplot(1, 4, 4)
-    rank_ax.set_title('Average Correct Rank')
-    rank_ax.plot(train_x_values, model.results['train_correct_rank'], label='Train')
-    rank_ax.plot(test_x_values, model.results['test_correct_rank'], label='Test')
-    rank_ax.legend(loc='best')
+    if model.compute_correct_rank:
+        rank_ax = plt.subplot(1, num_plots, 4)
+        rank_ax.set_title('Average Correct Rank')
+        rank_ax.plot(train_x_values, model.results['train_correct_rank'], label='Train')
+        rank_ax.plot(test_x_values, model.results['test_correct_rank'], label='Test')
+        rank_ax.legend(loc='best')
 
     plt.show()
 

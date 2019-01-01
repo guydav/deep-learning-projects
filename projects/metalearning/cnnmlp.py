@@ -55,12 +55,13 @@ class FCOutputModel(nn.Module):
         else:
             return F.softmax(x, dim=1)
 
-class CNN_MLP(BasicModel):
+
+class CNNMLP(BasicModel):
     def __init__(self, query_length, conv_filter_sizes=DEFAULT_CONV_FILTER_SIZES,
                  mlp_layer_sizes=DEFAULT_MLP_LAYER_SIZES, conv_output_size=7200,
                  lr=1e-4,
                  name='CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
-        super(CNN_MLP, self).__init__(name, save_dir)
+        super(CNNMLP, self).__init__(name, save_dir)
 
         self.query_length = query_length
         self.conv = ConvInputModel(conv_filter_sizes)
@@ -187,7 +188,9 @@ class PoolingDropoutCNNMLP(BasicModel):
                  use_mse=False, loss=None, compute_correct_rank=False,
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
         super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
-                                                   use_mse=use_mse, loss=loss, compute_correct_rank=compute_correct_rank)
+                                                   use_mse=use_mse, loss=loss,
+                                                   use_query=query_length != 0,
+                                                   compute_correct_rank=compute_correct_rank)
         
         self.query_length = query_length
         self.conv = PoolingDropoutConvInputModel(conv_filter_sizes,

@@ -54,7 +54,7 @@ class MetaLearningH5Dataset(Dataset):
         if self.transform is not None:
             x = self.transform(x)
 
-        return (x, q, y), index
+        return (x, y, q), index
 
     def __len__(self):
         return self.num_images * self.active_queries_per_image
@@ -89,7 +89,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
         if self.transform is not None:
             x = self.transform(x)
 
-        return (x, q, y), index
+        return (x, y, q), index
 
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,

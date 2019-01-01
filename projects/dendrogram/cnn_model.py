@@ -20,7 +20,7 @@ class DendrogramPoolingDropoutCNNMLP(PoolingDropoutCNNMLP):
                  use_mse=False, loss=None, compute_correct_rank=True,
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
         super(DendrogramPoolingDropoutCNNMLP, self).__init__(
-            query_size=0,
+            query_length=0,
             conv_filter_sizes=conv_filter_sizes, conv_dropout=conv_dropout, conv_p_dropout=conv_p_dropout,
             mlp_layer_sizes=mlp_layer_sizes, mlp_dropout=mlp_dropout, mlp_p_dropout=mlp_p_dropout,
             conv_output_size=conv_output_size, lr=lr, weight_decay=weight_decay, num_classes=num_classes,

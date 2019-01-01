@@ -1,6 +1,7 @@
 from scipy.special import logit, expit
 import numpy as np
 import tqdm
+import torch
 
 from .digit_mixer import SklearnDigitMixer
 from .abc import default_encoder
@@ -87,7 +88,7 @@ def diff(x):
     return x[1:] - x[:-1]
 
 
-def salt_proposal(x, h=DEFAULT_H, epsilon=DEFAULT_EPSILON, seed=None):
+def salt_proposal(x, h=DEFAULT_H, epsilon=DEFAULT_EPSILON, seed=None, ensure_sum=False):
     x = np.array(x)
     k = x.shape[0]
     h = np.array(h)
@@ -107,6 +108,10 @@ def salt_proposal(x, h=DEFAULT_H, epsilon=DEFAULT_EPSILON, seed=None):
     log_scaling_value = log_q_old_new[1] - logit_sum(x[np.arange(k) != i])
     # Logits of the rescaled simplex point
     x_new[np.arange(k) != i] = logit_scale(x[np.arange(k) != i], log_scaling_value)
+
+    if ensure_sum:
+        x_new[l] = logit(1 - np.sum(expit(x_new[np.arange(k) != l])))
+
     # Add detailed balance term
     log_transition_ratio = diff(log_p_old_new) + (k - 1) * diff(log_q_old_new)
 
@@ -122,13 +127,24 @@ def score_params(params, valid_digits, size, generator, encoder, model, metric,
 
 def abc_mcmc_simplex(valid_digits, train, prior_sampler, model, metric,
                      generator=SklearnDigitMixer, encoder=default_encoder,
-                     n_iter=100, n_chains=4, use_tqdm=True, debug=False):
+                     n_iter=100, n_chains=4, distance_inv_temp=1.0,
+                     salt_proposal_params=None, prior_dirichlet_params=None,
+                     use_tqdm=True, debug=False, return_raw_results=False):
+    if salt_proposal_params is None:
+        salt_proposal_params = dict()
+
+    if prior_dirichlet_params is not None:
+        if type(prior_dirichlet_params) != torch.Tensor:
+            prior_dirichlet_params = torch.from_numpy(prior_dirichlet_params)
+
+        dirichlet = torch.distributions.dirichlet.Dirichlet(prior_dirichlet_params, False)
+
     all_chains = []
 
     encoded_train = encoder(model, train)
 
     for c in range(n_chains):
-        if debug: print(f'Starting chain #{chain + 1}')
+        if debug: print(f'Starting chain #{c + 1}')
 
         # n_iter - 1 to arrive at a total of n_iter samples per chain
         # In the real world, there would be burn-in, and a whole host of stuff
@@ -138,16 +154,20 @@ def abc_mcmc_simplex(valid_digits, train, prior_sampler, model, metric,
             iterator = range(n_iter - 1)
 
         params_0 = prior_sampler(c)
+        if type(params_0) == torch.Tensor:
+            params_0 = np.squeeze(params_0.cpu().numpy())
+
         score_0 = score_params(params_0, valid_digits, train.shape[0], generator,
                                encoder, model, metric, encoded_train)
-        chain = [(score_0, params_0)]
+        chain = [(score_0, params_0, True)]
 
         for i in iterator:
-            current_score, current_params = chain[-1]
+            current_score, current_params, _ = chain[-1]
             current_logit = logit(current_params)
-            move_logit, log_move_ratio = salt_proposal(current_logit)
+            move_logit, log_move_ratio = salt_proposal(current_logit, **salt_proposal_params, ensure_sum=True)
 
             if np.any(np.logical_or(np.isnan(move_logit), np.isinf(move_logit))):
+                if debug: print(f'Rejected proposal because found nans or infs: {move_logit}')
                 chain.append(chain[-1])
                 continue
 
@@ -160,17 +180,30 @@ def abc_mcmc_simplex(valid_digits, train, prior_sampler, model, metric,
             # is just -score, and my log acceptance ratio is current_score - move_score
             # which intuitively seems reasonably, as it's positive (and improves acceptance probability)
             # when the current score is higher (worse) than the move score, and vice versa
-            log_acceptance_ratio = log_move_ratio + current_score - move_score
+            log_acceptance_ratio = log_move_ratio + (current_score - move_score) * distance_inv_temp
+
+            # Something I forgot in previous executions: the prior score
+            if prior_dirichlet_params is not None:
+                log_acceptance_ratio += dirichlet.log_prob(torch.from_numpy(move_params)).numpy() - \
+                                        dirichlet.log_prob(torch.from_numpy(current_params)).numpy()
+
             accept = np.log(np.random.uniform()) < log_acceptance_ratio
 
+            if debug: print(
+                f'Previous params {current_params} ({np.sum(current_params)}), score {current_score} | New params {move_params} ({np.sum(move_params)}), score {move_score} | Accept: {accept}')
+
             if accept:
-                chain.append((move_score, move_params))
+                chain.append((move_score, move_params, True))
             else:
-                chain.append(chain[-1])
+                chain.append((current_score, current_params, False))
 
         all_chains.append(chain)
 
     all_chain_results = [item for chain in all_chains for item in chain]
     all_chain_results.sort()
 
+    if return_raw_results:
+        return all_chains, all_chain_results
+
     return all_chain_results
+

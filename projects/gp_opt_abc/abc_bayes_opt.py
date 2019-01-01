@@ -8,7 +8,6 @@ import pyro.contrib.gp as gp
 pyro.enable_validation(True)
 
 
-
 class ABCBayesianOptimizer:
     def __init__(self, abc_routine, x_0, dim, x_proposal_sampler,
                  x_constraint=None, ucb_kappa=2, num_proposal_candidates=5,

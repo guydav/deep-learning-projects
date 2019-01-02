@@ -222,8 +222,7 @@ class PoolingDropoutCNNMLP(BasicModel):
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
                                                               factor=0.5, patience=10, verbose=True)
 
-    def post_test(self, test_loss):
-        epoch = len(self.test_losses)
+    def post_test(self, test_loss, epoch):
         if epoch > 100:
             self.scheduler.step(test_loss)
 

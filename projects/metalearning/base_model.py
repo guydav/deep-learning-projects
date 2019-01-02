@@ -230,7 +230,7 @@ class BasicModel(nn.Module):
     def _create_optimizer(self):
         raise NotImplementedError()
 
-    def post_test(self, test_loss):
+    def post_test(self, test_loss, epoch):
         pass
 
 
@@ -312,7 +312,7 @@ def test(model, dataloader, cuda=True, training=False):
     model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
     mean_loss = np.mean(test_results['losses'])
     model.results['test_losses'].append(mean_loss)
-    if training: model.post_test(mean_loss)
+    if training: model.post_test(mean_loss, len(model.results['test_losses']))
     model.results['test_aucs'].append(np.mean(test_results['aucs']))
     model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
 

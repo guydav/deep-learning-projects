@@ -117,7 +117,7 @@ class ResnetWrapper(BasicModel, ResNet):
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
                                                               factor=0.5, patience=10, verbose=True)
 
-    def post_test(self, test_loss):
+    def post_test(self, test_loss, epoch):
         self.scheduler.step(test_loss)
 
 

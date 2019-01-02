@@ -58,15 +58,6 @@ class BasicModel(nn.Module):
 
         self.results = defaultdict(list)
 
-        self.train_accuracies = []
-        self.train_losses = []
-        self.test_accuracies = []
-        self.test_losses = []
-        self.train_aucs = []
-        self.test_aucs = []
-        self.train_correct_rank = []
-        self.test_correct_rank = []
-
     def train_(self, input_img, label, query=None):
         if self.optimizer is None:
             self._create_optimizer()
@@ -183,21 +174,12 @@ class BasicModel(nn.Module):
 
     def save_model(self, epoch=None, save_results=True, **kwargs):
         if epoch is None:
-            epoch = len(self.train_accuracies)
+            epoch = len(self.results['train_accuracies'])
 
         torch.save(self.state_dict(), self._save_path(epoch))
-        self.results[epoch] = epoch
+        self.results['epoch'] = epoch
         self.results.update(kwargs)
-        #         results = dict(epoch=epoch,
-        #                        train_accuracies=self.train_accuracies,
-        #                        train_losses=self.train_losses,
-        #                        test_accuracies=self.test_accuracies,
-        #                        test_losses=self.test_losses,
-        #                        train_aucs=self.train_aucs,
-        #                        test_aucs=self.test_aucs,
-        #                        train_correct_rank=self.train_correct_rank,
-        #                        test_correct_rank=self.test_correct_rank,
-        #                        **kwargs)
+
         if save_results:
             self.save_results()
 
@@ -216,17 +198,11 @@ class BasicModel(nn.Module):
         elif epoch is None:
             print('Warning: should not set load_results=False without providing epoch #')
 
-        #         self.train_accuracies = results.pop('train_accuracies')
-        #         self.train_losses = results.pop('train_losses')
-        #         self.test_accuracies = results.pop('test_accuracies')
-        #         self.test_losses = results.pop('test_losses')
-        #         self.train_aucs = results.pop('train_aucs')
-        #         self.test_aucs = results.pop('test_aucs')
-        #         self.train_correct_rank = results.pop('train_correct_rank')
-        #         self.test_correct_rank = results.pop('test_correct_rank')
-
         if epoch is None:
-            epoch = len(self.train_accuracies)
+            if 'epoch' in self.results:
+                epoch = self.results['epoch']
+            else:
+                epoch = len(self.results['train_accuracies'])
 
         # adding support for partial states
         loaded_state = torch.load(self._save_path(epoch))

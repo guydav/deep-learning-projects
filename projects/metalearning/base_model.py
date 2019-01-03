@@ -275,7 +275,7 @@ def train_epoch(model, dataloader, cuda=True,
     model.results['train_accuracies'].append(np.mean(epoch_results['accuracies']))
     model.results['train_losses'].append(np.mean(epoch_results['losses']))
     model.results['train_aucs'].append(np.mean(epoch_results['aucs']))
-    model.results['train_correct_rank'].append(np.mean(epoch_results['correct_rank']))
+    if model.compute_correct_rank: model.results['train_correct_rank'].append(np.mean(epoch_results['correct_rank']))
 
     return epoch_results
 
@@ -314,7 +314,7 @@ def test(model, dataloader, cuda=True, training=False):
     model.results['test_losses'].append(mean_loss)
     if training: model.post_test(mean_loss, len(model.results['test_losses']))
     model.results['test_aucs'].append(np.mean(test_results['aucs']))
-    model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
+    if model.compute_correct_rank: model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
 
     return test_results
 
@@ -357,12 +357,16 @@ def mid_train_plot(model, epochs_to_test):
     plt.show()
 
 
-def print_status(epoch, status_type, results):
-    print(' '.join((
+def print_status(model, epoch, status_type, results):
+    status_lines = [
         f'{now()}: After epoch {epoch}, {status_type} acc is {np.mean(results["accuracies"]):.4f},',
-        f'loss is {np.mean(results["losses"]):.4f}, AUC is {np.mean(results["aucs"]):.4f},'
-        f'and correct rank is {np.mean(results["correct_rank"]):.4f}'
-    )))
+        f'loss is {np.mean(results["losses"]):.4f}, AUC is {np.mean(results["aucs"]):.4f}'
+    ]
+
+    if model.compute_correct_rank:
+        status_lines.append(f'and correct rank is {np.mean(results["correct_rank"]):.4f}')
+
+    print(' '.join(status_lines))
 
 
 def train(model, train_dataloader, test_dataloader, num_epochs=100,
@@ -377,14 +381,14 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         train_results = train_epoch(model, train_dataloader, cuda, num_batches_to_print)
-        print_status(epoch, 'TRAIN', train_results)
+        print_status(model, epoch, 'TRAIN', train_results, )
 
         if save:
             model.save_model()
 
         if epoch % epochs_to_test == 0:
             test_results = test(model, test_dataloader, cuda, True)
-            print_status(epoch, 'TEST', test_results)
+            print_status(model, epoch, 'TEST', test_results)
 
             log_results = {
                 'Train Accuracy': np.mean(train_results['accuracies']),

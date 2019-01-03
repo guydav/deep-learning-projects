@@ -120,6 +120,9 @@ class ResnetWrapper(BasicModel, ResNet):
     def post_test(self, test_loss, epoch):
         self.scheduler.step(test_loss)
 
+    def forward(self, img, query=None):
+        return super(ResnetWrapper, self).forward(img)
+
 
 def create_resnet18(name, **kwargs):
     # Stolen from torchvision.models.resnet, using my wrapper

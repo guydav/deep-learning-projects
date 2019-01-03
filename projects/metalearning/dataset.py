@@ -16,7 +16,7 @@ TEST_TRAIN_SPLIT_INDEX = 4096 * 7 // 8  # 512 * 7 // 8 #
 
 class MetaLearningH5Dataset(Dataset):
     def __init__(self, in_file, transform=None, start_index=0,
-                 end_index=None, query_subset=None):
+                 end_index=None, query_subset=None, return_indices=True):
         super(MetaLearningH5Dataset, self).__init__()
         self.file = h5py.File(in_file, 'r')
         self.transform = transform
@@ -36,6 +36,8 @@ class MetaLearningH5Dataset(Dataset):
         self.query_subset = query_subset
         self.active_queries_per_image = len(self.query_subset)
 
+        self.return_indices = return_indices
+
     def _compute_indices(self, index):
         image_index = self.start_index + (index // self.active_queries_per_image)
         query_index = index % self.active_queries_per_image
@@ -54,7 +56,10 @@ class MetaLearningH5Dataset(Dataset):
         if self.transform is not None:
             x = self.transform(x)
 
-        return (x, y, q), index
+        if self.return_indices:
+            return (x, y, q), index
+
+        return x, y, q
 
     def __len__(self):
         return self.num_images * self.active_queries_per_image
@@ -62,10 +67,10 @@ class MetaLearningH5Dataset(Dataset):
 
 class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
     def __init__(self, in_file, transform=None, start_index=0,
-                 end_index=None, query_subset=None,
+                 end_index=None, query_subset=None, return_indices=True,
                  num_dimensions=2, features_per_dimension=(10, 11)):
         super(MetaLearningH5DatasetFromDescription, self).__init__(
-            in_file, transform, start_index, end_index, query_subset)
+            in_file, transform, start_index, end_index, query_subset, return_indices)
 
         self.num_dimensions = num_dimensions
         self.features_per_dimension = features_per_dimension
@@ -89,11 +94,17 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
         if self.transform is not None:
             x = self.transform(x)
 
-        return (x, y, q), index
+        if self.return_indices:
+            return (x, y, q), index
+
+        return x, y, q
+
 
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
-                               test_train_split_index=TEST_TRAIN_SPLIT_INDEX, shuffle=True):
+                               test_train_split_index=TEST_TRAIN_SPLIT_INDEX,
+                               shuffle=True, query_subset=None, return_indices=False,
+                               dataset_class=MetaLearningH5DatasetFromDescription):
 
     to_tensor = transforms.ToTensor()
     resize = transforms.Resize(downsample_size)
@@ -106,9 +117,10 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         to_tensor
     ])
 
-    unnormalized_train_dataset = MetaLearningH5DatasetFromDescription(dataset_path,  # META_LEARNING_DATA_SMALL,
-                                                                      unnormalized_transformer,
-                                                                      end_index=test_train_split_index)
+    unnormalized_train_dataset = dataset_class(dataset_path, unnormalized_transformer,
+                                               end_index=test_train_split_index,
+                                               query_subset=query_subset,
+                                               return_indices=return_indices)
 
     transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
                                    unnormalized_train_dataset.file['X']])
@@ -136,15 +148,17 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         normalizer,
     ])
 
-    normalized_train_dataset = MetaLearningH5DatasetFromDescription(dataset_path,
-                                                                    normalized_augmenting_transformer,
-                                                                    end_index=test_train_split_index)
+    normalized_train_dataset = dataset_class(dataset_path, normalized_augmenting_transformer,
+                                             end_index=test_train_split_index,
+                                             query_subset=query_subset,
+                                             return_indices=return_indices)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
-    normalized_test_dataset = MetaLearningH5DatasetFromDescription(dataset_path,
-                                                                   normalized_transformer,  # augment only in train
-                                                                   start_index=test_train_split_index)
+    normalized_test_dataset = dataset_class(dataset_path, normalized_transformer,  # augment only in train
+                                            start_index=test_train_split_index,
+                                            query_subset=query_subset,
+                                            return_indices=return_indices)
     test_dataloader = DataLoader(normalized_test_dataset, batch_size=batch_size,
                                  shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 

@@ -394,9 +394,9 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
                 'Train Accuracy': np.mean(train_results['accuracies']),
                 'Train Loss': np.mean(train_results['losses']),
                 'Train AUC': np.mean(train_results['aucs']),
-                'Test Accuracy': np.mean(train_results['correct_rank']),
-                'Test Loss': np.mean(test_results['accuracies']),
-                'Test AUC': np.mean(test_results['losses']),
+                'Test Accuracy': np.mean(test_results['accuracies']),
+                'Test Loss': np.mean(test_results['losses']),
+                'Test AUC': np.mean(test_results['aucs']),
             }
             if model.compute_correct_rank:
                 log_results['Train Correct Rank'] = np.mean(train_results['correct_rank'])

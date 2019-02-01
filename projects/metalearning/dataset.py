@@ -111,11 +111,11 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         dataset_class_kwargs = {}
 
     to_tensor = transforms.ToTensor()
-    resize = transforms.Resize(downsample_size)
-    to_pil = transforms.ToPILImage()
 
     # TODO: why did I have to_tensor.float()? Add it back in later?
     if downsample_size is not None:
+        to_pil = transforms.ToPILImage()
+        resize = transforms.Resize(downsample_size)
         unnormalized_transformer = transforms.Compose([
             to_pil,
             resize,

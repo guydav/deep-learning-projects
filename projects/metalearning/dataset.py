@@ -11,7 +11,9 @@ BATCH_SIZE = 512  # 64
 NUM_WORKERS = 1
 
 DOWNSAMPLE_SIZE = (96, 128)
-TEST_TRAIN_SPLIT_INDEX = 4096 * 7 // 8  # 512 * 7 // 8 #
+DEFAULT_DATASET_SIZE = 4096
+DEFAULT_TRAIN_PROPORTION = 0.9
+
 
 
 class MetaLearningH5Dataset(Dataset):
@@ -84,10 +86,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
         desc = self.file['D'][image_index]
         y = int(np.any(desc == query_index))
-        q = np.zeros((self.num_dimensions + self.total_queries_per_image,))
-        # TODO: generalize for 2-item queries and 3rd dimensions
-        q[0] = query_index < self.features_per_dimension[0]
-        q[1] = 1 - q[0]
+        q = np.zeros((self.total_queries_per_image,))
         q[self.num_dimensions + query_index] = 1
 
         # Preprocessing each image
@@ -101,21 +100,26 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
+                               dataset_size=DEFAULT_DATASET_SIZE, dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
-                               test_train_split_index=TEST_TRAIN_SPLIT_INDEX,
+                               should_flip=True,
                                shuffle=True, query_subset=None, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription):
+    test_train_split_index = int(dataset_size * dataset_train_prop)
 
     to_tensor = transforms.ToTensor()
     resize = transforms.Resize(downsample_size)
     to_pil = transforms.ToPILImage()
 
     # TODO: why did I have to_tensor.float()? Add it back in later?
-    unnormalized_transformer = transforms.Compose([
-        to_pil,
-        resize,
-        to_tensor
-    ])
+    if downsample_size is not None:
+        unnormalized_transformer = transforms.Compose([
+            to_pil,
+            resize,
+            to_tensor
+        ])
+    else:
+        unnormalized_transformer = to_tensor
 
     unnormalized_train_dataset = dataset_class(dataset_path, unnormalized_transformer,
                                                end_index=test_train_split_index,
@@ -132,30 +136,32 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     normalizer = transforms.Normalize(torch.from_numpy(channel_means),
                                       torch.from_numpy(channel_stds))
 
-    normalized_transformer = transforms.Compose([
-        to_pil,
-        resize,
-        to_tensor,
-        normalizer,
-    ])
+    train_transforms = []
+    test_transforms = []
 
-    normalized_augmenting_transformer = transforms.Compose([
-        to_pil,
-        resize,
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        to_tensor,
-        normalizer,
-    ])
+    if downsample_size is not None:
+        train_transforms.extend([to_pil, resize])
+        test_transforms.extend([to_pil, resize])
 
-    normalized_train_dataset = dataset_class(dataset_path, normalized_augmenting_transformer,
+    if should_flip:
+        train_transforms.extend(
+            [transforms.RandomHorizontalFlip(),
+             transforms.RandomVerticalFlip()])
+
+    train_transforms.extend([to_tensor, normalizer])
+    test_transforms.extend([to_tensor, normalizer])
+
+    train_transformer = transforms.Compose(train_transforms)
+    test_transformer = transforms.Compose(test_transforms)
+
+    normalized_train_dataset = dataset_class(dataset_path, train_transformer,
                                              end_index=test_train_split_index,
                                              query_subset=query_subset,
                                              return_indices=return_indices)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
-    normalized_test_dataset = dataset_class(dataset_path, normalized_transformer,  # augment only in train
+    normalized_test_dataset = dataset_class(dataset_path, test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
                                             query_subset=query_subset,
                                             return_indices=return_indices)

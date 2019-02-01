@@ -87,7 +87,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
         desc = self.file['D'][image_index]
         y = int(np.any(desc == query_index))
         q = np.zeros((self.total_queries_per_image,))
-        q[self.num_dimensions + query_index] = 1
+        q[query_index] = 1
 
         # Preprocessing each image
         if self.transform is not None:

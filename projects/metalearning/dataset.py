@@ -11,9 +11,7 @@ BATCH_SIZE = 512  # 64
 NUM_WORKERS = 1
 
 DOWNSAMPLE_SIZE = (96, 128)
-DEFAULT_DATASET_SIZE = 4096
 DEFAULT_TRAIN_PROPORTION = 0.9
-
 
 
 class MetaLearningH5Dataset(Dataset):
@@ -100,13 +98,18 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
-                               dataset_size=DEFAULT_DATASET_SIZE, dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
+                               dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
                                should_flip=True,
                                shuffle=True, query_subset=None, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None):
-    test_train_split_index = int(dataset_size * dataset_train_prop)
+
+    full_dataset = dataset_class(dataset_path, query_subset=query_subset, return_indices=return_indices)
+    test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
+    print(f'Splitting test-train at {test_train_split_index}')
+    del full_dataset
+
     if dataset_class_kwargs is None:
         dataset_class_kwargs = {}
 

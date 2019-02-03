@@ -121,7 +121,7 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     cache_path = os.path.join(__location__, NORMALIZATION_CACHE_FILE)
 
     if os.path.exists(cache_path):
-        with open(cache_path, 'r') as cache_file:
+        with open(cache_path, 'rb') as cache_file:
             cache = pickle.load(cache_file)
 
     else:
@@ -161,7 +161,7 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         del unnormalized_train_dataset
 
         cache[cache_key] = channel_means, channel_stds
-        with open(cache_path, 'w') as cache_file:
+        with open(cache_path, 'wb') as cache_file:
             pickle.dump(cache, cache_file)
 
     print(channel_means)

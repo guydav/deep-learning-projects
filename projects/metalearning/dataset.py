@@ -3,6 +3,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import numpy as np
 import h5py
+import os
+import pickle
 
 
 META_LEARNING_DATA = 'drive/Research Projects/Meta-Learning/v1/CLEVR_meta_learning_uint8_desc.h5'
@@ -12,6 +14,8 @@ NUM_WORKERS = 1
 
 DOWNSAMPLE_SIZE = (96, 128)
 DEFAULT_TRAIN_PROPORTION = 0.9
+
+NORMALIZATION_CACHE_FILE = 'normalization_cache.pickle'
 
 
 class MetaLearningH5Dataset(Dataset):
@@ -113,29 +117,53 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     if dataset_class_kwargs is None:
         dataset_class_kwargs = {}
 
-    to_tensor = transforms.ToTensor()
+    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+    cache_path = os.path.join(__location__, NORMALIZATION_CACHE_FILE)
 
-    # TODO: why did I have to_tensor.float()? Add it back in later?
-    if downsample_size is not None:
-        to_pil = transforms.ToPILImage()
-        resize = transforms.Resize(downsample_size)
-        unnormalized_transformer = transforms.Compose([
-            to_pil,
-            resize,
-            to_tensor
-        ])
+    if os.path.exists(cache_path):
+        with open(cache_path, 'r') as cache_file:
+            cache = pickle.load(cache_file)
+
     else:
-        unnormalized_transformer = to_tensor
+        cache = {}
 
-    unnormalized_train_dataset = dataset_class(dataset_path, unnormalized_transformer,
-                                               end_index=test_train_split_index,
-                                               query_subset=query_subset,
-                                               return_indices=return_indices)
+    cache_key = (dataset_path, dataset_train_prop, downsample_size)
 
-    transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
-                                   unnormalized_train_dataset.file['X']])
-    channel_means = np.mean(transformed_images, (0, 2, 3))
-    channel_stds = np.std(transformed_images, (0, 2, 3))
+    if cache_key in cache:
+        print('Loaded normalization from cache')
+        channel_means, channel_stds = cache[cache_key]
+
+    else:
+
+        to_tensor = transforms.ToTensor()
+
+        # TODO: why did I have to_tensor.float()? Add it back in later?
+        if downsample_size is not None:
+            to_pil = transforms.ToPILImage()
+            resize = transforms.Resize(downsample_size)
+            unnormalized_transformer = transforms.Compose([
+                to_pil,
+                resize,
+                to_tensor
+            ])
+        else:
+            unnormalized_transformer = to_tensor
+
+        unnormalized_train_dataset = dataset_class(dataset_path, unnormalized_transformer,
+                                                   end_index=test_train_split_index,
+                                                   query_subset=query_subset,
+                                                   return_indices=return_indices)
+
+        transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
+                                       unnormalized_train_dataset.file['X']])
+        channel_means = np.mean(transformed_images, (0, 2, 3))
+        channel_stds = np.std(transformed_images, (0, 2, 3))
+        del unnormalized_train_dataset
+
+        cache[cache_key] = channel_means, channel_stds
+        with open(cache_path, 'w') as cache_file:
+            pickle.dump(cache, cache_file)
+
     print(channel_means)
     print(channel_stds)
 

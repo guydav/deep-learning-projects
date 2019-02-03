@@ -22,20 +22,23 @@ class MetaLearningH5Dataset(Dataset):
     def __init__(self, in_file, transform=None, start_index=0,
                  end_index=None, query_subset=None, return_indices=True):
         super(MetaLearningH5Dataset, self).__init__()
-        self.file = h5py.File(in_file, 'r')
-        self.transform = transform
 
+        self.in_file = in_file
+        self.file = None
+        self.transform = transform
         self.start_index = start_index
         self.end_index = end_index
-        if self.end_index is None:
-            self.end_index = self.file['X'].shape[0]
 
-        self.num_images = self.end_index - self.start_index
-        self.query_length = self.file['Q'].shape[2]
-        self.total_queries_per_image = self.file['Q'].shape[1]
+        with h5py.File(in_file, 'r') as file:
+            if self.end_index is None:
+                self.end_index = file['X'].shape[0]
 
-        if query_subset is None:
-            query_subset = np.arange(self.total_queries_per_image)
+            self.num_images = self.end_index - self.start_index
+            self.query_length = file['Q'].shape[2]
+            self.total_queries_per_image = file['Q'].shape[1]
+
+            if query_subset is None:
+                query_subset = np.arange(self.total_queries_per_image)
 
         self.query_subset = query_subset
         self.active_queries_per_image = len(self.query_subset)
@@ -51,6 +54,9 @@ class MetaLearningH5Dataset(Dataset):
 
     def __getitem__(self, index):
         image_index, query_index = self._compute_indices(index)
+
+        if self.file is None:
+            self.file = h5py.File(self.in_file, 'r')
 
         x = self.file['X'][image_index, ...]
         q = self.file['Q'][image_index, query_index, ...]
@@ -81,6 +87,9 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
     def __getitem__(self, index):
         image_index, query_index = self._compute_indices(index)
+
+        if self.file is None:
+            self.file = h5py.File(self.in_file, 'r')
 
         x = self.file['X'][image_index, ...]
         # TODO: for simple queries I can use y, but I will compute y, because I'll need to later

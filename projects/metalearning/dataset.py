@@ -128,15 +128,13 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         cache = {}
 
     cache_key = (dataset_path, dataset_train_prop, downsample_size)
+    to_tensor = transforms.ToTensor()
 
     if cache_key in cache:
         print('Loaded normalization from cache')
         channel_means, channel_stds = cache[cache_key]
 
     else:
-
-        to_tensor = transforms.ToTensor()
-
         # TODO: why did I have to_tensor.float()? Add it back in later?
         if downsample_size is not None:
             to_pil = transforms.ToPILImage()

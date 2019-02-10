@@ -220,14 +220,13 @@ class PoolingDropoutCNNMLP(BasicModel):
         self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
                                     weight_decay=self.weight_decay)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                              factor=0.5, patience=10, verbose=True)
+                                                              factor=0.5, patience=5, verbose=True)
 
     def post_test(self, test_loss, epoch):
-        if epoch > 100:
-            self.scheduler.step(test_loss)
+        # if epoch > 100:
+        self.scheduler.step(test_loss)
 
     def forward(self, img, query=None):
-
         x = self.conv(img)  ## x = (16 x 24 x 15 x 20)
         """fully connected layers"""
         x = x.view(x.size(0), -1)

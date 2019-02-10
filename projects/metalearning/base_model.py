@@ -238,7 +238,7 @@ def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def train_epoch(model, dataloader, cuda=True,
+def train_epoch(model, dataloader, cuda=True, device=None,
                 num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
     epoch_results = defaultdict(list)
 
@@ -251,9 +251,9 @@ def train_epoch(model, dataloader, cuda=True,
             Q = None
 
         if cuda:
-            X = X.cuda()
-            y = y.cuda()
-            if Q is not None: Q = Q.cuda()
+            X = X.to(device)
+            y = y.to(device)
+            if Q is not None: Q = Q.to(device)
 
         images = Variable(X)
         labels = Variable(y).long()
@@ -280,7 +280,7 @@ def train_epoch(model, dataloader, cuda=True,
     return epoch_results
 
 
-def test(model, dataloader, cuda=True, training=False):
+def test(model, dataloader, cuda=True, device=None, training=False):
     test_results = defaultdict(list)
 
     for batch in dataloader:
@@ -292,9 +292,9 @@ def test(model, dataloader, cuda=True, training=False):
             Q = None
 
         if cuda:
-            X = X.cuda()
-            y = y.cuda()
-            if Q is not None: Q = Q.cuda()
+            X = X.to(device)
+            y = y.to(device)
+            if Q is not None: Q = Q.to(device)
 
         images = Variable(X)
         labels = Variable(y).long()
@@ -329,8 +329,8 @@ def mid_train_plot(model, epochs_to_test):
 
     loss_ax = plt.subplot(1, num_plots, 1)
     loss_ax.set_title('Loss')
-    print(train_x_values, model.results['train_losses'])
-    print(test_x_values, model.results['test_losses'])
+    # print(train_x_values, model.results['train_losses'])
+    # print(test_x_values, model.results['test_losses'])
     loss_ax.plot(train_x_values, model.results['train_losses'], label='Train')
     loss_ax.plot(test_x_values, model.results['test_losses'], label='Test')
     loss_ax.legend(loc='best')
@@ -373,21 +373,25 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
           epochs_to_test=5, epochs_to_graph=None, cuda=True,
           num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT, save=True,
           start_epoch=0, watch=True):
+
     if epochs_to_graph is None:
         epochs_to_graph = epochs_to_test
+
+    if cuda:
+        device = next(model.parameters()).device
 
     if watch:
         wandb.watch(model)
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
-        train_results = train_epoch(model, train_dataloader, cuda, num_batches_to_print)
+        train_results = train_epoch(model, train_dataloader, cuda, device, num_batches_to_print)
         print_status(model, epoch, 'TRAIN', train_results, )
 
         if save:
             model.save_model()
 
         if epoch % epochs_to_test == 0:
-            test_results = test(model, test_dataloader, cuda, True)
+            test_results = test(model, test_dataloader, cuda, device, True)
             print_status(model, epoch, 'TEST', test_results)
 
             log_results = {

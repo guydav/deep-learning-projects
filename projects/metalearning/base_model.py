@@ -90,8 +90,8 @@ class BasicModel(nn.Module):
         loss.backward()
         self.optimizer.step()
 
-        correct = pred.eq(label.data).cpu().sum()
-        accuracy = correct * 100. / len(label)
+        correct = pred.eq(label.data).cpu()
+        accuracy = correct.sum() * 100. / len(label)
 
         # roc_auc score can fail if the entire batch has the same class
         try:

@@ -48,6 +48,9 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
                                                for query in query_order[:current_query_index + 1]],
         }
 
+        for k, v in log_results.items():
+            print(k, ':', v)
+
         wandb.log(log_results, step=epoch)
 
         current_query = query_order[current_query_index]

@@ -37,15 +37,15 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
             'Train AUC': np.mean(train_results['aucs']),
             # 'Train Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
             #                                     train_results['per_query_results'].items()},
-            # 'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
-            #                                     for query in query_order[:current_query_index + 1]]),
+            'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
+                                                for query in query_order[:current_query_index + 1]]),
             'Test Accuracy': np.mean(test_results['accuracies']),
             'Test Loss': np.mean(test_results['losses']),
             'Test AUC': np.mean(test_results['aucs']),
             # 'Test Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
             #                                    test_results['per_query_results'].items()},
-            # 'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
-            #                                    for query in query_order[:current_query_index + 1]]),
+            'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
+                                               for query in query_order[:current_query_index + 1]]),
         }
 
         log_results.update({f'Train accuracy, query = {query}': np.mean(values)
@@ -54,8 +54,8 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         log_results.update({f'Test accuracy, query = {query}': np.mean(values)
                             for query, values in test_results['per_query_results'].items()})
 
-        for k, v in log_results.items():
-            print(f'{k}: {v}')
+        # for k, v in log_results.items():
+        #     print(f'{k}: {v}')
 
         wandb.log(log_results, step=epoch)
 

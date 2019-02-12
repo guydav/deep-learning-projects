@@ -305,13 +305,13 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
 
     normalized_train_dataset = dataset_class(dataset_path, transform=train_transformer,
                                              end_index=test_train_split_index,
-                                             return_indices=return_indices, **dataset_class_kwargs)
+                                             return_indices=return_indices, **train_dataset_kwargs)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
     normalized_test_dataset = dataset_class(dataset_path, transform=test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
-                                            return_indices=return_indices, **dataset_class_kwargs)
+                                            return_indices=return_indices, **test_dataset_kwargs)
     test_dataloader = DataLoader(normalized_test_dataset, batch_size=batch_size,
                                  shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 

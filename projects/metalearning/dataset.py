@@ -137,6 +137,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             in_file, transform, start_index, end_index, None, return_indices,
             num_dimensions, features_per_dimension)
 
+        print(benchmark_dimension, random_seed, previous_query_coreset_size, query_order)
+
         if benchmark_dimension >= num_dimensions:
             raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
 
@@ -171,6 +173,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         negative_cache_key = (self.in_file, 'per_query_negative')
 
         if positive_cache_key in cache and negative_cache_key in cache:
+            print('Loading positive and negative images from cache')
             self.positive_images = cache[positive_cache_key]
             self.negative_images = cache[negative_cache_key]
 
@@ -203,7 +206,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         Sample the images for each coreset query to be used for the current epoch
         """
-        print(self.query_order, self.current_query_index, self.query_order[self.current_query_index])
+        print(self.query_order, self.current_query_index)
 
         self.current_epoch_queries = []
 

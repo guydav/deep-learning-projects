@@ -137,8 +137,6 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             in_file, transform, start_index, end_index, None, return_indices,
             num_dimensions, features_per_dimension)
 
-        print(benchmark_dimension, random_seed, previous_query_coreset_size, query_order)
-
         if benchmark_dimension >= num_dimensions:
             raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
 
@@ -206,8 +204,6 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         Sample the images for each coreset query to be used for the current epoch
         """
-        print(self.query_order, self.current_query_index)
-
         self.current_epoch_queries = []
 
         for previous_query_index in range(self.current_query_index):
@@ -216,7 +212,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             # This would happen in our test loader:
             if self.previous_query_coreset_size == self.num_images:
                 self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                           itertools.cycle(previous_query))))
+                                                           itertools.cycle([previous_query]))))
 
             else:
                 positive_queries = np.random.choice(self.positive_images[previous_query],
@@ -224,11 +220,11 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                 negative_queries = np.random.choice(self.negative_images[previous_query],
                                                     self.previous_query_coreset_size // 2)
 
-                self.current_epoch_queries.extend(list(zip(positive_queries, itertools.cycle(previous_query))))
-                self.current_epoch_queries.extend(list(zip(negative_queries, itertools.cycle(previous_query))))
+                self.current_epoch_queries.extend(list(zip(positive_queries, itertools.cycle([previous_query]))))
+                self.current_epoch_queries.extend(list(zip(negative_queries, itertools.cycle([previous_query]))))
 
         self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                   itertools.cycle(self.query_order[self.current_query_index]))))
+                                                   itertools.cycle([self.query_order[self.current_query_index]]))))
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]

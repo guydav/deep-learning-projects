@@ -37,24 +37,29 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
             'Train AUC': np.mean(train_results['aucs']),
             # 'Train Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
             #                                     train_results['per_query_results'].items()},
-            'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
-                                                for query in query_order[:current_query_index + 1]]),
+            # 'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
+            #                                     for query in query_order[:current_query_index + 1]]),
             'Test Accuracy': np.mean(test_results['accuracies']),
             'Test Loss': np.mean(test_results['losses']),
             'Test AUC': np.mean(test_results['aucs']),
             # 'Test Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
             #                                    test_results['per_query_results'].items()},
-            'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
-                                               for query in query_order[:current_query_index + 1]]),
+            # 'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
+            #                                    for query in query_order[:current_query_index + 1]]),
         }
-        #
-        # for k, v in log_results.items():
-        #     print(k, ':', v)
+
+        log_results.update({f'Train accuracy, query = {query}': np.mean(values)
+                            for query, values in train_results['per_query_results'].items()})
+
+        log_results.update({f'Test accuracy, query = {query}': np.mean(values)
+                            for query, values in test_results['per_query_results'].items()})
 
         wandb.log(log_results, step=epoch)
 
         current_query = query_order[current_query_index]
-        if log_results['Test Per-Query Accuracy (dict)'][current_query] > accuracy_threshold:
+        if log_results[f'Train accuracy, query = {current_query}'] > accuracy_threshold and \
+            log_results[f'Test accuracy, query = {current_query}'] > accuracy_threshold:
+
             print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({current_query}), moving to the next query')
             train_dataloader.dataset.next_query()
             test_dataloader.dataset.next_query()

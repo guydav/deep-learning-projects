@@ -208,12 +208,12 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
                                should_flip=True,
-                               shuffle=True, query_subset=None, return_indices=False,
+                               shuffle=True, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
                                normalization_dataset_class=MetaLearningH5DatasetFromDescription):
 
-    full_dataset = dataset_class(dataset_path, query_subset=query_subset, return_indices=return_indices)
+    full_dataset = normalization_dataset_class(dataset_path,return_indices=return_indices)
     test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
     print(f'Splitting test-train at {test_train_split_index}')
     del full_dataset
@@ -267,7 +267,6 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
 
         unnormalized_train_dataset = normalization_dataset_class(dataset_path, unnormalized_transformer,
                                                                  end_index=test_train_split_index,
-                                                                 query_subset=query_subset,
                                                                  return_indices=return_indices)
 
         transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
@@ -306,14 +305,12 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
 
     normalized_train_dataset = dataset_class(dataset_path, transform=train_transformer,
                                              end_index=test_train_split_index,
-                                             query_subset=query_subset,
                                              return_indices=return_indices, **dataset_class_kwargs)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
     normalized_test_dataset = dataset_class(dataset_path, transform=test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
-                                            query_subset=query_subset,
                                             return_indices=return_indices, **dataset_class_kwargs)
     test_dataloader = DataLoader(normalized_test_dataset, batch_size=batch_size,
                                  shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)

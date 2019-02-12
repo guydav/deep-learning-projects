@@ -114,7 +114,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
     def __init__(self, in_file, benchmark_dimension, random_seed,
-                 previous_query_coreset_size, query_order=None,
+                 previous_query_coreset_size, query_order,
                  transform=None, start_index=0, end_index=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10)):
         """
@@ -210,7 +210,8 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                should_flip=True,
                                shuffle=True, query_subset=None, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription,
-                               dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None):
+                               dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
+                               normalization_dataset_class=MetaLearningH5DatasetFromDescription):
 
     full_dataset = dataset_class(dataset_path, query_subset=query_subset, return_indices=return_indices)
     test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
@@ -264,10 +265,10 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         else:
             unnormalized_transformer = to_tensor
 
-        unnormalized_train_dataset = dataset_class(dataset_path, unnormalized_transformer,
-                                                   end_index=test_train_split_index,
-                                                   query_subset=query_subset,
-                                                   return_indices=return_indices)
+        unnormalized_train_dataset = normalization_dataset_class(dataset_path, unnormalized_transformer,
+                                                                 end_index=test_train_split_index,
+                                                                 query_subset=query_subset,
+                                                                 return_indices=return_indices)
 
         transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
                                        unnormalized_train_dataset.file['X']])
@@ -303,14 +304,14 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     train_transformer = transforms.Compose(train_transforms)
     test_transformer = transforms.Compose(test_transforms)
 
-    normalized_train_dataset = dataset_class(dataset_path, train_transformer,
+    normalized_train_dataset = dataset_class(dataset_path, transform=train_transformer,
                                              end_index=test_train_split_index,
                                              query_subset=query_subset,
                                              return_indices=return_indices, **dataset_class_kwargs)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
-    normalized_test_dataset = dataset_class(dataset_path, test_transformer,  # augment only in train
+    normalized_test_dataset = dataset_class(dataset_path, transform=test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
                                             query_subset=query_subset,
                                             return_indices=return_indices, **dataset_class_kwargs)

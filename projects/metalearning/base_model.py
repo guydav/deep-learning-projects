@@ -20,7 +20,7 @@ import os
 
 DEFAULT_SAVE_DIR = 'drive/Research Projects/Meta-Learning/v1/models'
 DEFAULT_NUM_EPOCHS = 10
-DEFAULT_NUM_BATCHES_TO_PRINT = 100
+DEFAULT_NUM_BATCHES_TO_PRINT = 10000
 
 DEFAULT_CONV_FILTER_SIZES = (24, 24, 24, 24)
 DEFAULT_MLP_LAYER_SIZES = (256, 64, 16, 4)
@@ -106,11 +106,16 @@ class BasicModel(nn.Module):
         except ValueError:
             auc = None
 
+        per_query_results = defaultdict(list)
+        for q, c in zip(np.argmax(query.cpu().numpy(), 1), correct.numpy()):
+            per_query_results[q].append(c)
+
         results = dict(
             accuracy=accuracy,
             loss=loss.item(),
             auc=auc,
             pred=pred,
+            per_query_results=per_query_results
         )
 
         if self.compute_correct_rank:
@@ -159,11 +164,16 @@ class BasicModel(nn.Module):
         except ValueError:
             auc = None
 
+        per_query_results = defaultdict(list)
+        for q, c in zip(np.argmax(query.cpu().numpy(), 1), correct.numpy()):
+            per_query_results[q].append(c)
+
         results = dict(
             accuracy=accuracy,
             loss=loss.item(),
             auc=auc,
             pred=pred,
+            per_query_results=per_query_results
         )
 
         if self.compute_correct_rank:
@@ -241,6 +251,7 @@ def now():
 def train_epoch(model, dataloader, cuda=True, device=None,
                 num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
     epoch_results = defaultdict(list)
+    epoch_results['per_query_results'] = defaultdict(list)
 
     for batch_index, batch in enumerate(dataloader):
         if model.use_query:
@@ -268,6 +279,9 @@ def train_epoch(model, dataloader, cuda=True, device=None,
         if 'auc' in results and results['auc'] is not None: epoch_results['aucs'].append(results['auc'])
         if model.compute_correct_rank: epoch_results['correct_rank'].extend(results['correct_rank'])
 
+        for query in results['per_query_results']:
+            epoch_results['per_query_results'][query].extend(results['per_query_results'][query])
+
         if (batch_index + 1) % num_batches_to_print == 0:
             print(
                 f'{now()}: After batch {batch_index + 1}, average acc is {np.mean(accuracies):.3f} and average loss is {np.mean(losses):.3f}')
@@ -276,12 +290,15 @@ def train_epoch(model, dataloader, cuda=True, device=None,
     model.results['train_losses'].append(np.mean(epoch_results['losses']))
     model.results['train_aucs'].append(np.mean(epoch_results['aucs']))
     if model.compute_correct_rank: model.results['train_correct_rank'].append(np.mean(epoch_results['correct_rank']))
+    model.results['train_per_query_accuracies'].append(
+        {query: np.mean(values) for query, values in epoch_results['per_query_results'].items()})
 
     return epoch_results
 
 
 def test(model, dataloader, cuda=True, device=None, training=False):
     test_results = defaultdict(list)
+    test_results['per_query_results'] = defaultdict(list)
 
     for batch in dataloader:
         if model.use_query:
@@ -309,18 +326,24 @@ def test(model, dataloader, cuda=True, device=None, training=False):
         if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
         if model.compute_correct_rank: test_results['correct_rank'].extend(results['correct_rank'])
 
+        for query in results['per_query_results']:
+            test_results['per_query_results'][query].extend(results['per_query_results'][query])
+
     model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
     mean_loss = np.mean(test_results['losses'])
     model.results['test_losses'].append(mean_loss)
-    if training: model.post_test(mean_loss, len(model.results['test_losses']))
     model.results['test_aucs'].append(np.mean(test_results['aucs']))
     if model.compute_correct_rank: model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
+    model.results['test_per_query_accuracies'].append(
+        {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
+
+    if training: model.post_test(mean_loss, len(model.results['test_losses']))
 
     return test_results
 
 
 def mid_train_plot(model, epochs_to_test):
-    num_plots = 3 + int(model.compute_correct_rank)
+    num_plots = 4
     plt.figure(figsize=(16, num_plots))
     epoch = len(model.results['train_losses'])
     plt.suptitle(f'After epoch {epoch}')
@@ -347,12 +370,23 @@ def mid_train_plot(model, epochs_to_test):
     auc_ax.plot(test_x_values, model.results['test_aucs'], label='Test')
     auc_ax.legend(loc='best')
 
-    if model.compute_correct_rank:
-        rank_ax = plt.subplot(1, num_plots, 4)
-        rank_ax.set_title('Average Correct Rank')
-        rank_ax.plot(train_x_values, model.results['train_correct_rank'], label='Train')
-        rank_ax.plot(test_x_values, model.results['test_correct_rank'], label='Test')
-        rank_ax.legend(loc='best')
+    per_query_accuracies = defaultdict(list)
+    for epoch_accuracies in model.results['test_per_query_accuracies']:
+        for query, acc in epoch_accuracies.items():
+            per_query_accuracies[query].append(acc)
+
+    per_query_accuracy_ax = plt.subplot(1, num_plots, 4)
+    per_query_accuracy_ax.set_title('Average Per-Query Accuracy (test)')
+    for query, accuracies in per_query_accuracies.items():
+        per_query_accuracy_ax.plot(test_x_values[-len(accuracies):], accuracies, label=str(query))
+    per_query_accuracy_ax.legend(loc='best')
+
+    # if model.compute_correct_rank:
+    #     rank_ax = plt.subplot(1, num_plots, 4)
+    #     rank_ax.set_title('Average Correct Rank')
+    #     rank_ax.plot(train_x_values, model.results['train_correct_rank'], label='Train')
+    #     rank_ax.plot(test_x_values, model.results['test_correct_rank'], label='Test')
+    #     rank_ax.legend(loc='best')
 
     plt.show()
 
@@ -398,9 +432,13 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
                 'Train Accuracy': np.mean(train_results['accuracies']),
                 'Train Loss': np.mean(train_results['losses']),
                 'Train AUC': np.mean(train_results['aucs']),
+                'Train Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
+                                                    train_results['per_query_results'].items()},
                 'Test Accuracy': np.mean(test_results['accuracies']),
                 'Test Loss': np.mean(test_results['losses']),
                 'Test AUC': np.mean(test_results['aucs']),
+                'Test Per-Query Accuracy (dict)': {query: np.mean(values) for query, values in
+                                                   test_results['per_query_results'].items()},
             }
             if model.compute_correct_rank:
                 log_results['Train Correct Rank'] = np.mean(train_results['correct_rank'])

@@ -162,8 +162,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         with h5py.File(self.in_file, 'r') as file:
             y = file['y']
-            for i in y.shape[0]:
-                for q in y.shape[1]:
+            for i in range(y.shape[0]):
+                for q in range(y.shape[1]):
                     if y[i, q] == 1:
                         self.positive_images[q].append(i)
                     else:

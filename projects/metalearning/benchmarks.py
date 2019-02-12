@@ -69,3 +69,6 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 
         if epoch % epochs_to_graph == 0:
             mid_train_plot(model, 1)
+
+        if train_dataloader.dataset.current_query_index == len(query_order):
+            return

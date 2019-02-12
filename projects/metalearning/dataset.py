@@ -17,7 +17,7 @@ NUM_WORKERS = 1
 DOWNSAMPLE_SIZE = (96, 128)
 DEFAULT_TRAIN_PROPORTION = 0.9
 
-NORMALIZATION_CACHE_FILE = 'normalization_cache.pickle'
+DATASET_CACHE_FILE = 'dataset_cache.pickle'
 
 
 class MetaLearningH5Dataset(Dataset):
@@ -157,17 +157,41 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.start_epoch()
 
     def _cache_images_by_query(self):
-        self.positive_images = defaultdict(list)
-        self.negative_images = defaultdict(list)
+        __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+        cache_path = os.path.join(__location__, DATASET_CACHE_FILE)
 
-        with h5py.File(self.in_file, 'r') as file:
-            y = file['y']
-            for i in range(y.shape[0]):
-                for q in range(y.shape[1]):
-                    if y[i, q] == 1:
-                        self.positive_images[q].append(i)
-                    else:
-                        self.negative_images[q].append(i)
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as cache_file:
+                cache = pickle.load(cache_file)
+
+        else:
+            cache = {}
+
+        positive_cache_key = (self.in_file, 'per_query_positive')
+        negative_cache_key = (self.in_file, 'per_query_negative')
+
+        if positive_cache_key in cache and negative_cache_key in cache:
+            self.positive_images = cache[positive_cache_key]
+            self.negative_images = cache[negative_cache_key]
+
+        else:
+            self.positive_images = defaultdict(list)
+            self.negative_images = defaultdict(list)
+
+            with h5py.File(self.in_file, 'r') as file:
+                y = file['y']
+                for i in range(y.shape[0]):
+                    for q in range(y.shape[1]):
+                        if y[i, q] == 1:
+                            self.positive_images[q].append(i)
+                        else:
+                            self.negative_images[q].append(i)
+
+            cache[positive_cache_key] = self.positive_images
+            cache[negative_cache_key] = self.negative_images
+
+            with open(cache_path, 'wb') as cache_file:
+                pickle.dump(cache, cache_file)
 
     def __len__(self):
         return self.current_query_index * self.previous_query_coreset_size + self.num_images
@@ -179,6 +203,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         Sample the images for each coreset query to be used for the current epoch
         """
+        print(self.query_order, self.current_query_index, self.query_order[self.current_query_index])
+
         self.current_epoch_queries = []
 
         for previous_query_index in range(self.current_query_index):
@@ -186,7 +212,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
             # This would happen in our test loader:
             if self.previous_query_coreset_size == self.num_images:
-                self.current_epoch_queries.extend(list(zip(range(self.num_images),                                                           itertools.cycle(previous_query))))
+                self.current_epoch_queries.extend(list(zip(range(self.num_images),
+                                                           itertools.cycle(previous_query))))
 
             else:
                 positive_queries = np.random.choice(self.positive_images[previous_query],
@@ -236,7 +263,7 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
             test_dataset_kwargs[key] = dataset_class_kwargs[key]
 
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-    cache_path = os.path.join(__location__, NORMALIZATION_CACHE_FILE)
+    cache_path = os.path.join(__location__, DATASET_CACHE_FILE)
 
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as cache_file:

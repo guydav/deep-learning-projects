@@ -54,6 +54,9 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         log_results.update({f'Test accuracy, query = {query}': np.mean(values)
                             for query, values in test_results['per_query_results'].items()})
 
+        for k, v in log_results.items():
+            print(f'{k}: {v}')
+
         wandb.log(log_results, step=epoch)
 
         current_query = query_order[current_query_index]

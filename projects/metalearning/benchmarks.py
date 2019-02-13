@@ -12,6 +12,8 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
     if watch:
         wandb.watch(model)
 
+    total_training_size = 0
+
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         train_dataloader.dataset.start_epoch()
         test_dataloader.dataset.start_epoch()
@@ -31,7 +33,10 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         query_order = train_dataloader.dataset.query_order
         current_query_index = train_dataloader.dataset.current_query_index
 
+        total_training_size += len(train_dataloader.dataset)
+
         log_results = {
+            'Total Train Size': total_training_size,
             'Train Accuracy': np.mean(train_results['accuracies']),
             'Train Loss': np.mean(train_results['losses']),
             'Train AUC': np.mean(train_results['aucs']),
@@ -48,11 +53,11 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
                                                for query in query_order[:current_query_index + 1]]),
         }
 
-        log_results.update({f'Train accuracy, query = {query}': np.mean(values)
-                            for query, values in train_results['per_query_results'].items()})
+        log_results.update({f'Train accuracy, query #{index + 1}': np.mean(train_results['per_query_results'][query])
+                            for index, query in enumerate(query_order[:current_query_index + 1])})
 
-        log_results.update({f'Test accuracy, query = {query}': np.mean(values)
-                            for query, values in test_results['per_query_results'].items()})
+        log_results.update({f'Test accuracy, query #{index + 1}': np.mean(test_results['per_query_results'][query])
+                            for index, query in enumerate(query_order[:current_query_index + 1])})
 
         # for k, v in log_results.items():
         #     print(f'{k}: {v}')

@@ -145,9 +145,16 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.random_seed = random_seed
         np.random.seed(random_seed)
 
-        if query_order is not None:
-            if len(query_order) != features_per_dimension[benchmark_dimension]:
-                raise ValueError(f'The length of the query order ({query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
+        if len(query_order) != features_per_dimension[benchmark_dimension]:
+            raise ValueError(f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
+
+        dimension_sizes = list(np.cumsum(features_per_dimension))
+        dimension_sizes.insert(0, 0)
+
+        if np.any(np.array(query_order) < dimension_sizes[benchmark_dimension]) or \
+                np.any(np.array(query_order) >= dimension_sizes[benchmark_dimension + 1]):
+            raise ValueError(
+                f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
 
         self.query_order = query_order
         self.current_query_index = 0

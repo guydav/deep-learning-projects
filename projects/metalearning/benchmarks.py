@@ -64,11 +64,10 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 
         wandb.log(log_results, step=epoch)
 
-        current_query = query_order[current_query_index]
-        if log_results[f'Train accuracy, query = {current_query}'] > accuracy_threshold and \
-            log_results[f'Test accuracy, query = {current_query}'] > accuracy_threshold:
+        if log_results['Train Per-Query Accuracy (list)'][current_query_index] > accuracy_threshold and \
+                log_results['Test Per-Query Accuracy (list)'][current_query_index] > accuracy_threshold:
 
-            print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({current_query}), moving to the next query')
+            print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({query_order[current_query_index]}), moving to the next query')
             train_dataloader.dataset.next_query()
             test_dataloader.dataset.next_query()
 

@@ -114,7 +114,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
     def __init__(self, in_file, benchmark_dimension, random_seed,
-                 previous_query_coreset_size, query_order,
+                 previous_query_coreset_size, query_order, coreset_size_shared=False,
                  transform=None, start_index=0, end_index=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10)):
         """
@@ -142,6 +142,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         self.benchmark_dimension = benchmark_dimension
         self.previous_query_coreset_size = previous_query_coreset_size
+        self.coreset_size_shared = coreset_size_shared
         self.random_seed = random_seed
         np.random.seed(random_seed)
 
@@ -213,6 +214,11 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         self.current_epoch_queries = []
 
+        if self.coreset_size_shared and self.current_query_index > 0:
+            query_coreset_sizes = np.array([int(self.previous_query_coreset_size * i / self.current_query_index)
+                                            for i in range(self.current_query_index + 1)])
+            query_coreset_sizes = query_coreset_sizes[1:] - query_coreset_sizes[:-1]
+
         for previous_query_index in range(self.current_query_index):
             previous_query = self.query_order[previous_query_index]
 
@@ -222,10 +228,17 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                                                            itertools.cycle([previous_query]))))
 
             else:
-                positive_queries = np.random.choice(self.positive_images[previous_query],
-                                                    self.previous_query_coreset_size // 2)
-                negative_queries = np.random.choice(self.negative_images[previous_query],
-                                                    self.previous_query_coreset_size // 2)
+                if self.coreset_size_shared:
+                    current_coreset_size = query_coreset_sizes[previous_query_index]
+                    positive_size = current_coreset_size // 2
+                    negative_size = current_coreset_size - positive_size
+
+                else:
+                    positive_size = self.previous_query_coreset_size // 2
+                    negative_size = positive_size
+
+                positive_queries = np.random.choice(self.positive_images[previous_query], positive_size)
+                negative_queries = np.random.choice(self.negative_images[previous_query], negative_size)
 
                 self.current_epoch_queries.extend(list(zip(positive_queries, itertools.cycle([previous_query]))))
                 self.current_epoch_queries.extend(list(zip(negative_queries, itertools.cycle([previous_query]))))

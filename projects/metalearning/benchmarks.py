@@ -53,11 +53,21 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
                                                for query in query_order[:current_query_index + 1]]),
         }
 
-        log_results.update({f'Train accuracy, query #{index + 1}': np.mean(train_results['per_query_results'][query])
+        log_results.update({f'Train Accuracy, Query #{index + 1}': np.mean(train_results['per_query_results'][query])
                             for index, query in enumerate(query_order[:current_query_index + 1])})
 
-        log_results.update({f'Test accuracy, query #{index + 1}': np.mean(test_results['per_query_results'][query])
+        log_results.update({f'Test Accuracy, Query #{index + 1}': np.mean(test_results['per_query_results'][query])
                             for index, query in enumerate(query_order[:current_query_index + 1])})
+
+        if current_query_index > 0:
+            log_results['Train Mean Previous-Query Accuracy'] = np.mean(
+                [np.mean(train_results['per_query_results'][query])
+                 for query in query_order[:current_query_index]])
+
+            log_results['Test Mean Previous-Query Accuracy'] = np.mean(
+                [np.mean(test_results['per_query_results'][query])
+                 for query in query_order[:current_query_index]])
+
 
         # for k, v in log_results.items():
         #     print(f'{k}: {v}')

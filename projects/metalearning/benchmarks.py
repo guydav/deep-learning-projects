@@ -40,14 +40,14 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
             'Train Accuracy': np.mean(train_results['accuracies']),
             'Train Loss': np.mean(train_results['losses']),
             'Train AUC': np.mean(train_results['aucs']),
-            'Train Per-Query Accuracy (dict)': {index: np.mean(train_results['per_query_results'][query])
+            'Train Per-Query Accuracy (dict)': {str(index): np.mean(train_results['per_query_results'][query])
                                                 for index, query in enumerate(query_order[:current_query_index + 1])},
             'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
                                                          for query in query_order[:current_query_index + 1]]),
             'Test Accuracy': np.mean(test_results['accuracies']),
             'Test Loss': np.mean(test_results['losses']),
             'Test AUC': np.mean(test_results['aucs']),
-            'Train Per-Query Accuracy (dict)': {index: np.mean(test_results['per_query_results'][query])
+            'Train Per-Query Accuracy (dict)': {str(index): np.mean(test_results['per_query_results'][query])
                                                 for index, query in enumerate(query_order[:current_query_index + 1])},
             'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
                                                         for query in query_order[:current_query_index + 1]]),

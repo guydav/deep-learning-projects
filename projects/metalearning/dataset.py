@@ -203,7 +203,12 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                 pickle.dump(cache, cache_file)
 
     def __len__(self):
-        return self.current_query_index * self.previous_query_coreset_size + self.num_images
+        coreset_size =self.previous_query_coreset_size
+
+        if not self.coreset_size_shared:
+            coreset_size *= self.current_query_index
+            
+        return coreset_size + self.num_images
 
     def next_query(self):
         self.current_query_index += 1

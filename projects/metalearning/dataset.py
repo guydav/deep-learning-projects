@@ -203,7 +203,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                 pickle.dump(cache, cache_file)
 
     def __len__(self):
-        coreset_size = self.previous_query_coreset_size
+        coreset_size = (self.current_query_index > 0) * self.previous_query_coreset_size
 
         if not self.coreset_size_shared:
             coreset_size *= self.current_query_index
@@ -251,7 +251,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.current_epoch_queries.extend(list(zip(range(self.num_images),
                                                    itertools.cycle([self.query_order[self.current_query_index]]))))
 
-        print(self.current_query_index, len(self), len(self.current_epoch_queries))
+        # print(self.current_query_index, len(self), len(self.current_epoch_queries))
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]

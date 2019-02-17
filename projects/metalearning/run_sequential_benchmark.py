@@ -40,7 +40,7 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
-    args = parser.parse_args(sys.argv)
+    args = parser.parse_args(sys.argv[1:])
 
     dataset_path = args.dataset_path
     batch_size = args.batch_size

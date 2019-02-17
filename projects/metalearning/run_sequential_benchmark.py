@@ -40,9 +40,9 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
-    args = parser.parse_args(sys.argv)
-
-    dataset_path = args.dataset_path
+    args = parser.parse_args()
+    
+    dataset_path = args.path_dataset
     batch_size = args.batch_size
     num_workers = args.num_workers
     pin_memory = bool(args.pin_memory)

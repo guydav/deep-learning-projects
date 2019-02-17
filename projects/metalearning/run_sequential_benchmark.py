@@ -26,7 +26,7 @@ parser.add_argument('--dataset_random_seed', type=int, default=None)
 parser.add_argument('--train_coreset_size', type=int)
 DEFAULT_TEST_CORESET_SIZE = 5000
 parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
-parser.add_argument('--shared_train_coreset', type=int, default=1)
+parser.add_argument('--coreset_per_query', type=int, default=0)
 parser.add_argument('--query_order', default=None)
 DEFAULT_ACCURACY_THRESHOLD = 0.95
 parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY_THRESHOLD)
@@ -40,9 +40,9 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
-    args = parser.parse_args(sys.argv[1:])
-
-    dataset_path = args.dataset_path
+    args = parser.parse_args()
+    
+    dataset_path = args.path_dataset
     batch_size = args.batch_size
     num_workers = args.num_workers
     pin_memory = bool(args.pin_memory)
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     train_coreset_size = args.train_coreset_size
     test_coreset_size = args.test_coreset_size
-    shared_train_coreset = bool(args.shared_train_coreset)
+    train_coreset_size_per_query = bool(args.coreset_per_query)
 
     if args.query_order is not None:
         query_order = np.array([int(x) for x in args.query_order.split(' ')])
@@ -73,7 +73,6 @@ if __name__ == '__main__':
     current_epoch = 0
     total_epochs = args.max_epochs
     threshold_all_queries = bool(args.threshold_all_queries)
-
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,
@@ -91,7 +90,7 @@ if __name__ == '__main__':
                                    ),
                                    train_dataset_kwargs=dict(
                                        previous_query_coreset_size=train_coreset_size,
-                                       coreset_size_shared=shared_train_coreset,
+                                       coreset_size_per_query=train_coreset_size_per_query,
                                    ),
                                    test_dataset_kwargs=dict(previous_query_coreset_size=test_coreset_size))
 

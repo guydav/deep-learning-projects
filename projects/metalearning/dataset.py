@@ -114,7 +114,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
     def __init__(self, in_file, benchmark_dimension, random_seed,
-                 previous_query_coreset_size, query_order, coreset_per_query=False,
+                 previous_query_coreset_size, query_order, coreset_size_per_query=False,
                  transform=None, start_index=0, end_index=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10),
                  imbalance_threshold=0.25, num_sampling_attempts=10):
@@ -143,7 +143,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         self.benchmark_dimension = benchmark_dimension
         self.previous_query_coreset_size = previous_query_coreset_size
-        self.coreset_per_query = coreset_per_query
+        self.coreset_size_per_query = coreset_size_per_query
         self.random_seed = random_seed
         np.random.seed(random_seed)
         self.imbalance_threshold = imbalance_threshold
@@ -208,7 +208,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def __len__(self):
         coreset_size = (self.current_query_index > 0) * self.previous_query_coreset_size
 
-        if self.coreset_per_query:
+        if self.coreset_size_per_query:
             coreset_size *= self.current_query_index
 
         return coreset_size + self.num_images
@@ -222,7 +222,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         self.current_epoch_queries = []
 
-        if not self.coreset_per_query:
+        if not self.coreset_size_per_query:
             current_task_set = set(np.random.choice(self.num_images,
                                                     self.num_images - self.previous_query_coreset_size,
                                                     False))
@@ -242,7 +242,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                                                            itertools.cycle([previous_query]))))
 
             else:
-                if self.coreset_per_query:
+                if self.coreset_size_per_query:
                     positive_size = self.previous_query_coreset_size // 2
                     negative_size = positive_size
                     positive_queries = np.random.choice(self.positive_images[previous_query], positive_size, False)
@@ -274,7 +274,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
                 self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
 
-        if self.coreset_per_query:  # use the entire training set for the previous query
+        if self.coreset_size_per_query:  # use the entire training set for the previous query
             self.current_epoch_queries.extend(list(zip(range(self.num_images),
                                                    itertools.cycle([self.query_order[self.current_query_index]]))))
         else:

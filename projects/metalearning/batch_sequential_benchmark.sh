@@ -23,7 +23,7 @@ wandb login 9676e3cc95066e4865586082971f2653245f09b4
 for i in `seq 1 ${num_reps}`; do
     # TODO: how do I specify boolean args? Integer?
     let "current_random_seed = ${initial_dataset_random_seed} + ${i}"
-    echo "python run_sequential_benchmark.py --train_coreset_size 22500 --shared_train_coreset True --dataset_random_seed ${current_random_seed}"
+    python run_sequential_benchmark.py --train_coreset_size 22500 --shared_train_coreset 1 --dataset_random_seed ${current_random_seed}
     sleep 1s;
 done
 

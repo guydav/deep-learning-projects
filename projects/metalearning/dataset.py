@@ -114,9 +114,10 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
     def __init__(self, in_file, benchmark_dimension, random_seed,
-                 previous_query_coreset_size, query_order, coreset_size_shared=False,
+                 previous_query_coreset_size, query_order, coreset_per_query=False,
                  transform=None, start_index=0, end_index=None, return_indices=True,
-                 num_dimensions=3, features_per_dimension=(10, 10, 10)):
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.25, num_sampling_attempts=10):
         """
         Important API-wise:
         Call start_epoch whenever, well, you're starting a new epoch
@@ -142,9 +143,11 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         self.benchmark_dimension = benchmark_dimension
         self.previous_query_coreset_size = previous_query_coreset_size
-        self.coreset_size_shared = coreset_size_shared
+        self.coreset_per_query = coreset_per_query
         self.random_seed = random_seed
         np.random.seed(random_seed)
+        self.imbalance_threshold = imbalance_threshold
+        self.num_sampling_attempts = num_sampling_attempts
 
         if len(query_order) != features_per_dimension[benchmark_dimension]:
             raise ValueError(f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
@@ -205,7 +208,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def __len__(self):
         coreset_size = (self.current_query_index > 0) * self.previous_query_coreset_size
 
-        if not self.coreset_size_shared:
+        if self.coreset_per_query:
             coreset_size *= self.current_query_index
 
         return coreset_size + self.num_images
@@ -213,16 +216,22 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def next_query(self):
         self.current_query_index += 1
 
-    def start_epoch(self):
+    def start_epoch(self, depth=0):
         """
         Sample the images for each coreset query to be used for the current epoch
         """
         self.current_epoch_queries = []
 
-        if self.coreset_size_shared and self.current_query_index > 0:
-            query_coreset_sizes = np.array([int(self.previous_query_coreset_size * i / self.current_query_index)
-                                            for i in range(self.current_query_index + 1)])
-            query_coreset_sizes = query_coreset_sizes[1:] - query_coreset_sizes[:-1]
+        if not self.coreset_per_query:
+            current_task_set = set(np.random.choice(self.num_images,
+                                                    self.num_images - self.previous_query_coreset_size,
+                                                    False))
+            coreset = set(range(self.num_images)).difference(current_task_set)
+
+            if self.current_query_index > 0:
+                query_coreset_sizes = np.array([int(self.previous_query_coreset_size * i / self.current_query_index)
+                                                for i in range(self.current_query_index + 1)])
+                query_coreset_sizes = query_coreset_sizes[1:] - query_coreset_sizes[:-1]
 
         for previous_query_index in range(self.current_query_index):
             previous_query = self.query_order[previous_query_index]
@@ -233,23 +242,45 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                                                            itertools.cycle([previous_query]))))
 
             else:
-                if self.coreset_size_shared:
-                    current_coreset_size = query_coreset_sizes[previous_query_index]
-                    positive_size = current_coreset_size // 2
-                    negative_size = current_coreset_size - positive_size
-
-                else:
+                if self.coreset_per_query:
                     positive_size = self.previous_query_coreset_size // 2
                     negative_size = positive_size
+                    positive_queries = np.random.choice(self.positive_images[previous_query], positive_size, False)
+                    negative_queries = np.random.choice(self.negative_images[previous_query], negative_size, False)
+                    current_task_coreset = np.concatenate((positive_queries, negative_queries))
 
-                positive_queries = np.random.choice(self.positive_images[previous_query], positive_size)
-                negative_queries = np.random.choice(self.negative_images[previous_query], negative_size)
+                else:  # shared coreset among all queries
+                    current_coreset_size = query_coreset_sizes[previous_query_index]
 
-                self.current_epoch_queries.extend(list(zip(positive_queries, itertools.cycle([previous_query]))))
-                self.current_epoch_queries.extend(list(zip(negative_queries, itertools.cycle([previous_query]))))
+                    smaller_proportion = 0
+                    attempt_count = 0
 
-        self.current_epoch_queries.extend(list(zip(range(self.num_images),
+                    while smaller_proportion < self.imbalance_threshold \
+                            and attempt_count < self.num_sampling_attempts:
+
+                        attempt_count += 1
+
+                        current_task_coreset = np.random.choice(list(coreset), current_coreset_size, False)
+                        positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
+                        negative_count = sum([x in self.negative_images[previous_query] for x in current_task_coreset])
+
+                        smaller_proportion = min(positive_count / current_coreset_size,
+                                                 negative_count / current_coreset_size)
+
+                    if attempt_count >= self.num_sampling_attempts:
+                        self.start_epoch(depth + 1)
+
+                    coreset = coreset.difference(set(current_task_coreset))
+
+                self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
+
+        if self.coreset_per_query:  # use the entire training set for the previous query
+            self.current_epoch_queries.extend(list(zip(range(self.num_images),
                                                    itertools.cycle([self.query_order[self.current_query_index]]))))
+        else:
+            self.current_epoch_queries.extend(list(zip(current_task_set,
+                                                       itertools.cycle([self.query_order[self.current_query_index]]))))
+
 
         # print(self.current_query_index, len(self), len(self.current_epoch_queries))
 

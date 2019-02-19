@@ -1,7 +1,6 @@
 import sys
 import torch
 
-torch.multiprocessing.set_start_method("spawn")
 sys.path.extend(('/home/cc/deep-learning-projects', '/home/cc/src/tqdm'))
 
 import projects
@@ -23,7 +22,8 @@ parser.add_argument('--pin_memory', type=int, default=DEFAULT_PIN_MEMORY)
 parser.add_argument('--script_random_seed', type=int, default=None)
 parser.add_argument('--benchmark_dimension', type=int, default=None)
 parser.add_argument('--dataset_random_seed', type=int, default=None)
-parser.add_argument('--train_coreset_size', type=int)
+DEFAULT_TRAIN_CORESET_SIZE = 22500
+parser.add_argument('--train_coreset_size', type=int, default=DEFAULT_TRAIN_CORESET_SIZE)
 DEFAULT_TEST_CORESET_SIZE = 5000
 parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
 parser.add_argument('--coreset_size_per_query', type=int, default=0)
@@ -44,6 +44,8 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
+    torch.multiprocessing.set_start_method("spawn")
+
     args = parser.parse_args()
     
     dataset_path = args.path_dataset
@@ -145,4 +147,4 @@ if __name__ == '__main__':
 
     sequential_benchmark(sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,
-                         num_epochs=total_epochs - current_epoch, epochs_to_graph=10, start_epoch=current_epoch)
+                         num_epochs=total_epochs - current_epoch, epochs_to_graph=200, start_epoch=current_epoch)

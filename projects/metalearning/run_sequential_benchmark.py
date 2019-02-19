@@ -26,7 +26,7 @@ parser.add_argument('--dataset_random_seed', type=int, default=None)
 parser.add_argument('--train_coreset_size', type=int)
 DEFAULT_TEST_CORESET_SIZE = 5000
 parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
-parser.add_argument('--coreset_per_query', type=int, default=0)
+parser.add_argument('--coreset_size_per_query', type=int, default=0)
 parser.add_argument('--query_order', default=None)
 DEFAULT_ACCURACY_THRESHOLD = 0.95
 parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY_THRESHOLD)
@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     train_coreset_size = args.train_coreset_size
     test_coreset_size = args.test_coreset_size
-    train_coreset_size_per_query = bool(args.coreset_per_query)
+    train_coreset_size_per_query = bool(args.coreset_size_per_query)
 
     if args.query_order is not None:
         query_order = np.array([int(x) for x in args.query_order.split(' ')])

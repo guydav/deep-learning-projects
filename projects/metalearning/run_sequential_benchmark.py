@@ -31,6 +31,10 @@ parser.add_argument('--query_order', default=None)
 DEFAULT_ACCURACY_THRESHOLD = 0.95
 parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY_THRESHOLD)
 
+DEFAULT_LEARNING_RATE = 5e-4
+parser.add_argument('--learning_rate', type=float, default=DEFAULT_LEARNING_RATE)
+parser.add_argument('--weight_decay', type=float, default=0)
+
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
@@ -94,13 +98,16 @@ if __name__ == '__main__':
                                    ),
                                    test_dataset_kwargs=dict(previous_query_coreset_size=test_coreset_size))
 
+    learning_rate = args.learning_rate
+    weight_decay = args.weight_decay
+
     sequential_benchmark_test_model = PoolingDropoutCNNMLP(
         query_length=30,
         conv_filter_sizes=(16, 32, 48, 64),
         conv_output_size=4480,
         mlp_layer_sizes=(512, 512, 512, 512),
-        lr=5e-4,
-        weight_decay=0,  # 1e-4,
+        lr=learning_rate,
+        weight_decay=weight_decay,  # 1e-4,
         lr_scheduler_patience=100,
         conv_dropout=False,
         mlp_dropout=False,

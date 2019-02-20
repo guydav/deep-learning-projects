@@ -102,7 +102,10 @@ if __name__ == '__main__':
                                        previous_query_coreset_size=train_coreset_size,
                                        coreset_size_per_query=train_coreset_size_per_query,
                                    ),
-                                   test_dataset_kwargs=dict(previous_query_coreset_size=test_coreset_size))
+                                   test_dataset_kwargs=dict(
+                                       previous_query_coreset_size=test_coreset_size,
+                                       coreset_size_per_query=True,
+                                   ))
 
     learning_rate = args.learning_rate
     weight_decay = args.weight_decay

@@ -35,6 +35,7 @@ DEFAULT_LEARNING_RATE = 5e-4
 parser.add_argument('--learning_rate', type=float, default=DEFAULT_LEARNING_RATE)
 parser.add_argument('--weight_decay', type=float, default=0)
 
+parser.add_argument('--id')
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
@@ -128,6 +129,7 @@ if __name__ == '__main__':
         description += '\n'
 
     description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
+    wandb.run.id = f'{args.id}-{dataset_random_seed}'
     wandb.run.description = description
     wandb.run.save()
 

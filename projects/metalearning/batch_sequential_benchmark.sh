@@ -12,7 +12,7 @@
 
 gpu_id=$1
 num_reps=$2
-run_id=$3
+run_name=$3
 initial_dataset_random_seed=$4
 
 export CUDA_DEVICE_ORDER='PCI_BUS_ID'
@@ -21,9 +21,8 @@ export CUDA_VISIBLE_DEVICES=${gpu_id}
 wandb login 9676e3cc95066e4865586082971f2653245f09b4
 
 for i in `seq 1 ${num_reps}`; do
-    # TODO: how do I specify boolean args? Integer?
     let "current_random_seed = ${initial_dataset_random_seed} + ${i}"
-    python run_sequential_benchmark.py --id ${run_id} --dataset_random_seed ${current_random_seed} ${@:5}
+    python run_sequential_benchmark.py --name ${run_name} --dataset_random_seed ${current_random_seed} ${@:5}
     sleep 1s;
 done
 

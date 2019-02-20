@@ -2,10 +2,10 @@
 
 echo $#
 echo $@
-let "test = $# < 4";
+let "test = $# <= 3";
 echo $test
 
-if [[ $# < 4 ]];  then
+if [[ $# <= 3 ]];  then
     echo "Usage: ./batch_sequential_benchmark.sh <GPU ID> <Number of repetitions> <run id> <Dataset Random seed> [additional arguments to the internal script]"
     exit 1
 fi

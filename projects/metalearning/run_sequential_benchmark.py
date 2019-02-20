@@ -45,7 +45,10 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method("spawn")
+    try:
+        torch.multiprocessing.set_start_method("spawn")
+    except RuntimeError:
+        pass
 
     args = parser.parse_args()
     

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-echo $#
-echo $@
-let "test = $# <= 3";
-echo $test
-
-if [[ $# <= 3 ]];  then
-    echo "Usage: ./batch_sequential_benchmark.sh <GPU ID> <Number of repetitions> <run id> <Dataset Random seed> [additional arguments to the internal script]"
-    exit 1
-fi
+#echo $#
+#echo $@
+#let "test = $# <= 3";
+#echo $test
+#
+#if [[ $# <= 3 ]];  then
+#    echo "Usage: ./batch_sequential_benchmark.sh <GPU ID> <Number of repetitions> <run id> <Dataset Random seed> [additional arguments to the internal script]"
+#    exit 1
+#fi
 
 gpu_id=$1
 num_reps=$2

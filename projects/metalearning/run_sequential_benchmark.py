@@ -40,7 +40,7 @@ parser.add_argument('--name')
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
-DEFAULT_MAX_EPOCHS = 200
+DEFAULT_MAX_EPOCHS = 400
 parser.add_argument('--max_epochs', default=DEFAULT_MAX_EPOCHS)
 parser.add_argument('--threshold_all_queries', type=int, default=1)
 
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     wandb.config.test_coreset_size = test_coreset_size
     wandb.config.query_order = [int(x) for x in query_order]
     wandb.config.accuracy_threshold = accuracy_threshold
-    wandb.config.epochs=total_epochs
+    wandb.config.epochs = total_epochs
 
     sequential_benchmark(sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,

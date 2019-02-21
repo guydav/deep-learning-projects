@@ -234,8 +234,7 @@ class BasicModel(nn.Module):
 
     def _init_dir(self):
         os.makedirs(self._save_dir(), exist_ok=True)
-
-        print(os.system(f'ls -laR {self._save_dir()}'))
+        # print(os.system(f'ls -laR {self._save_dir()}'))
 
     def _create_optimizer(self):
         raise NotImplementedError()

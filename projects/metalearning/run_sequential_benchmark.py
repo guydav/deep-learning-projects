@@ -121,7 +121,7 @@ if __name__ == '__main__':
         lr_scheduler_patience=100,
         conv_dropout=False,
         mlp_dropout=False,
-        name='no_dropout_no_decay_sequential_benchmark_v1_coreset_15k_second_dimension',
+        name=f'{args.name}-{dataset_random_seed}',
         save_dir=save_dir)
 
     sequential_benchmark_test_model.load_model(current_epoch)

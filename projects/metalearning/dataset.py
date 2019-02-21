@@ -192,17 +192,17 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             self.negative_images = cache[negative_cache_key]
 
         else:
-            self.positive_images = defaultdict(list)
-            self.negative_images = defaultdict(list)
+            self.positive_images = defaultdict(set)
+            self.negative_images = defaultdict(set)
 
             with h5py.File(self.in_file, 'r') as file:
                 y = file['y']
                 for i in range(y.shape[0]):
                     for q in range(y.shape[1]):
                         if y[i, q] == 1:
-                            self.positive_images[q].append(i)
+                            self.positive_images[q].add(i)
                         else:
-                            self.negative_images[q].append(i)
+                            self.negative_images[q].add(i)
 
             cache[positive_cache_key] = self.positive_images
             cache[negative_cache_key] = self.negative_images
@@ -262,8 +262,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                 if self.coreset_size_per_query:
                     positive_size = self.previous_query_coreset_size // 2
                     negative_size = positive_size
-                    positive_queries = np.random.choice(self.positive_images[previous_query], positive_size, False)
-                    negative_queries = np.random.choice(self.negative_images[previous_query], negative_size, False)
+                    positive_queries = np.random.choice(list(self.positive_images[previous_query]), positive_size, False)
+                    negative_queries = np.random.choice(list(self.negative_images[previous_query]), negative_size, False)
                     current_task_coreset = np.concatenate((positive_queries, negative_queries))
 
                 else:  # shared coreset among all queries

@@ -7,7 +7,7 @@ import os
 import pickle
 from collections import defaultdict
 import itertools
-import datetime
+from datetime import datetime
 
 
 META_LEARNING_DATA = 'drive/Research Projects/Meta-Learning/v1/CLEVR_meta_learning_uint8_desc.h5'

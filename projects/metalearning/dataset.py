@@ -374,6 +374,9 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                                                  end_index=test_train_split_index,
                                                                  return_indices=return_indices)
 
+        # To get it to load the file
+        _ = unnormalized_train_dataset[0]
+
         transformed_images = np.stack([unnormalized_transformer(image).numpy() for image in
                                        unnormalized_train_dataset.file['X']])
         channel_means = np.mean(transformed_images, (0, 2, 3))

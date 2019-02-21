@@ -225,7 +225,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def next_query(self):
         self.current_query_index += 1
 
-    def start_epoch(self, depth=0, debug=False):
+    def start_epoch(self, debug=False, depth=0):
         """
         Sample the images for each coreset query to be used for the current epoch
         """
@@ -286,7 +286,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
                     if attempt_count >= self.num_sampling_attempts:
                         print(f'Warning, failed to balance query #{previous_query_index + 1}, restarting...')
-                        return self.start_epoch(depth + 1)
+                        return self.start_epoch(debug, depth + 1)
 
                     if debug: debug_print(f'Successfully generated coreset for current task')
                     coreset = coreset.difference(set(current_task_coreset))

@@ -2,7 +2,8 @@ from .base_model import *
 
 
 def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold, threshold_all_queries=False,
-                         num_epochs=100, epochs_to_graph=None, cuda=True, save=True, start_epoch=0, watch=True):
+                         num_epochs=100, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
+                         watch=True, debug=False):
     if epochs_to_graph is None:
         epochs_to_graph = 10
 
@@ -17,10 +18,10 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
     print(f'Working in query order {query_order}, starting from query #0 ({query_order[0]})')
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
-        print(f'{now()}: before train start_epoch')
-        train_dataloader.dataset.start_epoch()
-        print(f'{now()}: before test start_epoch')
-        test_dataloader.dataset.start_epoch()
+        if debug: print(f'{now()}: before train start_epoch')
+        train_dataloader.dataset.start_epoch(debug)
+        if debug: print(f'{now()}: before test start_epoch')
+        test_dataloader.dataset.start_epoch(debug)
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')
 
         train_results = train_epoch(model, train_dataloader, cuda, device)

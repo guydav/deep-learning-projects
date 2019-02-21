@@ -44,6 +44,8 @@ DEFAULT_MAX_EPOCHS = 400
 parser.add_argument('--max_epochs', default=DEFAULT_MAX_EPOCHS)
 parser.add_argument('--threshold_all_queries', type=int, default=1)
 
+parser.add_argument('--debug', action='store_true')
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -157,4 +159,5 @@ if __name__ == '__main__':
                          threshold_all_queries=threshold_all_queries,
                          num_epochs=total_epochs - current_epoch,
                          epochs_to_graph=total_epochs + 1,
-                         start_epoch=current_epoch)
+                         start_epoch=current_epoch,
+                         debug=args.debug)

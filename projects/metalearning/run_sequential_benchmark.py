@@ -46,17 +46,17 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 
 if __name__ == '__main__':
-    try:
-        torch.multiprocessing.set_start_method("spawn")
-    except RuntimeError:
-        pass
-
     args = parser.parse_args()
-    
     dataset_path = args.path_dataset
     batch_size = args.batch_size
     num_workers = args.num_workers
     pin_memory = bool(args.pin_memory)
+
+    if num_workers > 1:
+        try:
+            torch.multiprocessing.set_start_method("spawn")
+        except RuntimeError:
+            pass
 
     if args.script_random_seed is not None:
         np.random.seed(args.script_random_seed)

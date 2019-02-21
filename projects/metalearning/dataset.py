@@ -282,9 +282,9 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                         current_task_coreset = np.random.choice(coreset_list, current_coreset_size, False)
                         if debug: debug_print(f'Sampled current task coreset')
                         positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
-                        negative_count = sum([x in self.negative_images[previous_query] for x in current_task_coreset])
+                        # negative_count = sum([x in self.negative_images[previous_query] for x in current_task_coreset])
                         smaller_proportion = min(positive_count / current_coreset_size,
-                                                 negative_count / current_coreset_size)
+                                                 1 - (positive_count / current_coreset_size))
                         if debug: debug_print(f'Computed counts and proportions')
 
                     if attempt_count >= self.num_sampling_attempts:

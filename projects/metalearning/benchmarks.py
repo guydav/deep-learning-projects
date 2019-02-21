@@ -17,9 +17,10 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
     print(f'Working in query order {query_order}, starting from query #0 ({query_order[0]})')
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
+        print(f'{now()}: before train start_epoch')
         train_dataloader.dataset.start_epoch()
+        print(f'{now()}: before test start_epoch')
         test_dataloader.dataset.start_epoch()
-
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')
 
         train_results = train_epoch(model, train_dataloader, cuda, device)
@@ -70,7 +71,6 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
             log_results['Test Mean Previous-Query Accuracy'] = np.mean(
                 [np.mean(test_results['per_query_results'][query])
                  for query in query_order[:current_query_index]])
-
 
         # for k, v in log_results.items():
         #     print(f'{k}: {v}')

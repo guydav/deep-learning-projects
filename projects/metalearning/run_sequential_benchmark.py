@@ -155,4 +155,6 @@ if __name__ == '__main__':
 
     sequential_benchmark(sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,
-                         num_epochs=total_epochs - current_epoch, epochs_to_graph=200, start_epoch=current_epoch)
+                         num_epochs=total_epochs - current_epoch,
+                         epochs_to_graph=total_epochs + 1,
+                         start_epoch=current_epoch)

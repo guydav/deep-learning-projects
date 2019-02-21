@@ -13,10 +13,14 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         wandb.watch(model)
 
     total_training_size = 0
+    query_order = train_dataloader.dataset.query_order
+    print(f'Working in query order {query_order}, starting from query #0 ({query_order[0]})')
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         train_dataloader.dataset.start_epoch()
         test_dataloader.dataset.start_epoch()
+
+        print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')
 
         train_results = train_epoch(model, train_dataloader, cuda, device)
         print_status(model, epoch, 'TRAIN', train_results)
@@ -30,7 +34,6 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         test_results = test(model, test_dataloader, cuda, device, True)
         print_status(model, epoch, 'TEST', test_results)
 
-        query_order = train_dataloader.dataset.query_order
         current_query_index = train_dataloader.dataset.current_query_index
 
         total_training_size += len(train_dataloader.dataset)

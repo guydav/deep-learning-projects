@@ -33,7 +33,8 @@ parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY
 
 DEFAULT_LEARNING_RATE = 5e-4
 parser.add_argument('--learning_rate', type=float, default=DEFAULT_LEARNING_RATE)
-parser.add_argument('--weight_decay', type=float, default=0)
+DEFAULT_WEIGHT_DECAY = 1e-4
+parser.add_argument('--weight_decay', type=float, default=DEFAULT_WEIGHT_DECAY)
 
 parser.add_argument('--name')
 parser.add_argument('--description', default='')

@@ -7,6 +7,7 @@ import os
 import pickle
 from collections import defaultdict
 import itertools
+import datetime
 
 
 META_LEARNING_DATA = 'drive/Research Projects/Meta-Learning/v1/CLEVR_meta_learning_uint8_desc.h5'
@@ -110,6 +111,10 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
             return (x, y, q), index
 
         return x, y, q
+
+
+def debug_print(message):
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {message}')
 
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
@@ -220,11 +225,13 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def next_query(self):
         self.current_query_index += 1
 
-    def start_epoch(self, depth=0):
+    def start_epoch(self, depth=0, debug=False):
         """
         Sample the images for each coreset query to be used for the current epoch
         """
         self.current_epoch_queries = []
+
+        if debug: debug_print('Starting start_epoch')
 
         if depth >= self.num_sampling_attempts:
             print('Warning, exceeded maximum number of sampling attempts, this is not great')
@@ -243,6 +250,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         for previous_query_index in range(self.current_query_index):
             previous_query = self.query_order[previous_query_index]
+
+            if debug: debug_print(f'Starting previous query #{previous_query_index} = {previous_query}')
 
             # This would happen in our test loader:
             if self.previous_query_coreset_size == self.num_images:
@@ -267,7 +276,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                             and attempt_count < self.num_sampling_attempts:
 
                         attempt_count += 1
-
+                        if debug: debug_print(f'Starting attempt #{attempt_count}')
                         current_task_coreset = np.random.choice(list(coreset), current_coreset_size, False)
                         positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
                         negative_count = sum([x in self.negative_images[previous_query] for x in current_task_coreset])
@@ -279,6 +288,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                         print(f'Warning, failed to balance query #{previous_query_index + 1}, restarting...')
                         return self.start_epoch(depth + 1)
 
+                    if debug: debug_print(f'Successfully generated coreset for current task')
                     coreset = coreset.difference(set(current_task_coreset))
 
                 self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))

@@ -183,7 +183,7 @@ class PoolingDropoutCNNMLP(BasicModel):
     def __init__(self, query_length=21, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),
-                 mlp_dropout=True, mlp_p_dropout=0.5, lr_scheduler_patience=5,
+                 mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
                  conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
                  use_mse=False, loss=None, compute_correct_rank=False,
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
@@ -215,18 +215,21 @@ class PoolingDropoutCNNMLP(BasicModel):
                                                  output_size=output_size)
         self.lr = lr
         self.weight_decay = weight_decay
+        self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
 
     def _create_optimizer(self):
         self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
                                     weight_decay=self.weight_decay)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                              factor=0.5, patience=self.lr_scheduler_patience,
-                                                              verbose=True)
+        if self.use_lr_scheduler:
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
+                                                                  factor=0.5,
+                                                                  patience=self.lr_scheduler_patience,
+                                                                  verbose=True)
 
     def post_test(self, test_loss, epoch):
-        # if epoch > 100:
-        self.scheduler.step(test_loss)
+        if self.use_lr_scheduler:
+            self.scheduler.step(test_loss)
 
     def forward(self, img, query=None):
         x = self.conv(img)  ## x = (16 x 24 x 15 x 20)

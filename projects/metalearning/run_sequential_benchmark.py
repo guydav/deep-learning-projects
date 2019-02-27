@@ -19,6 +19,21 @@ parser.add_argument('--num_workers', type=int, default=DEFAULT_NUM_WORKERS)
 DEFAULT_PIN_MEMORY = 1
 parser.add_argument('--pin_memory', type=int, default=DEFAULT_PIN_MEMORY)
 
+WILLIAMS_SQUARE_TEN = np.array(
+    [[ 1,  2, 10,  3,  9,  4,  8,  5,  7,  6],
+     [ 2,  3,  1,  4, 10,  5,  9,  6,  8,  7],
+     [ 3,  4,  2,  5,  1,  6, 10,  7,  9,  8],
+     [ 4,  5,  3,  6,  2,  7,  1,  8, 10,  9],
+     [ 5,  6,  4,  7,  3,  8,  2,  9,  1, 10],
+     [ 6,  7,  5,  8,  4,  9,  3, 10,  2,  1],
+     [ 7,  8,  6,  9,  5, 10,  4,  1,  3,  2],
+     [ 8,  9,  7, 10,  6,  1,  5,  2,  4,  3],
+     [ 9, 10,  8,  1,  7,  2,  6,  3,  5,  4],
+     [10,  1,  9,  2,  8,  3,  7,  4,  6,  5]])
+parser.add_argument('--use_latin_square', action='store_true')
+parser.add_argument('--latin_square_random_seed', type=int, default=None)
+parser.add_argument('--latin_square_index', type=int, default=None)
+
 parser.add_argument('--script_random_seed', type=int, default=None)
 parser.add_argument('--benchmark_dimension', type=int, default=None)
 parser.add_argument('--dataset_random_seed', type=int, default=None)
@@ -41,8 +56,11 @@ parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
 DEFAULT_MAX_EPOCHS = 400
-parser.add_argument('--max_epochs', default=DEFAULT_MAX_EPOCHS)
+parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 parser.add_argument('--threshold_all_queries', type=int, default=1)
+
+DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
+parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 parser.add_argument('--debug', action='store_true')
 
@@ -66,6 +84,7 @@ if __name__ == '__main__':
     benchmark_dimension = args.benchmark_dimension
     if benchmark_dimension is None:
         benchmark_dimension = np.random.randint(3)
+
     dataset_random_seed = args.dataset_random_seed
     if dataset_random_seed is None:
         dataset_random_seed = np.random.randint(2 ** 32)
@@ -76,9 +95,20 @@ if __name__ == '__main__':
 
     if args.query_order is not None:
         query_order = np.array([int(x) for x in args.query_order.split(' ')])
+
     else:
-        query_order = np.arange(10) + benchmark_dimension * 10
-        np.random.shuffle(query_order)
+        if args.use_latin_square:
+            latin_square_random = np.random.RandomState(args.latin_square_random_seed)
+            latin_square = np.copy(WILLIAMS_SQUARE_TEN)
+            latin_square_random.shuffle(latin_square)  # permute rows
+            latin_square_random.shuffle(latin_square.T)  # permute cols
+            query_order = latin_square[args.latin_square_index % latin_square.shape[0]]
+
+        else:
+            query_order = np.arange(10)
+            np.random.shuffle(query_order)
+
+        query_order += benchmark_dimension * 10
 
     accuracy_threshold = args.accuracy_threshold
 
@@ -120,7 +150,7 @@ if __name__ == '__main__':
         mlp_layer_sizes=(512, 512, 512, 512),
         lr=learning_rate,
         weight_decay=weight_decay,  # 1e-4,
-        lr_scheduler_patience=100,
+        use_lr_scheduler=False,
         conv_dropout=False,
         mlp_dropout=False,
         name=f'{args.name}-{dataset_random_seed}',
@@ -131,7 +161,7 @@ if __name__ == '__main__':
 
     # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
     # os.environ['WANDB_RESUME'] = 'must'
-    wandb.init(entity='meta-learning-scaling', project='sequential-benchmark')
+    wandb.init(entity='meta-learning-scaling', project=args.wandb_project)
 
     description = args.description
     if len(description) > 0:
@@ -154,6 +184,10 @@ if __name__ == '__main__':
     wandb.config.query_order = [int(x) for x in query_order]
     wandb.config.accuracy_threshold = accuracy_threshold
     wandb.config.epochs = total_epochs
+
+    if args.use_latin_square:
+        wandb.config.latin_square_random_seed = args.latin_square_random_seed
+        wandb.config.latin_square_index = args.latin_square_index
 
     sequential_benchmark(sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,

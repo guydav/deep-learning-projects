@@ -298,6 +298,11 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             self.current_epoch_queries.extend(list(zip(range(self.num_images),
                                                    itertools.cycle([self.query_order[self.current_query_index]]))))
         else:
+            if self.current_query_index == 0:
+                image_set = set(np.random.choice(self.num_images,
+                                                 self.num_images - self.previous_query_coreset_size,
+                                                 False))
+
             self.current_epoch_queries.extend(list(zip(image_set,
                                                        itertools.cycle([self.query_order[self.current_query_index]]))))
 

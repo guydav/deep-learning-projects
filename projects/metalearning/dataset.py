@@ -234,14 +234,10 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         if debug: debug_print('Starting start_epoch')
 
         if depth >= self.num_sampling_attempts:
-            print('Warning, exceeded maximum number of sampling attempts, this is not great')
-            # TODO: should I abort here?
+            raise ValueError('Warning, exceeded maximum number of sampling attempts, this is not great')
 
         if not self.coreset_size_per_query:
-            current_task_set = set(np.random.choice(self.num_images,
-                                                    self.num_images - self.previous_query_coreset_size,
-                                                    False))
-            coreset = set(range(self.num_images)).difference(current_task_set)
+            image_set = set(range(self.num_images))
 
             if self.current_query_index > 0:
                 query_coreset_sizes = np.array([int(self.previous_query_coreset_size * i / self.current_query_index)
@@ -277,12 +273,14 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
                         attempt_count += 1
                         if debug: debug_print(f'Starting attempt #{attempt_count}')
-                        coreset_list = list(coreset)
+                        image_list = list(image_set)
                         if debug: debug_print(f'Casted coreset to a list')
-                        current_task_coreset = np.random.choice(coreset_list, current_coreset_size, False)
+                        current_task_coreset = np.random.choice(image_list, current_coreset_size, False)
                         if debug: debug_print(f'Sampled current task coreset')
+
+                        # negative_count = sum([x in self.negative_images[previous_query]
+                        # for x in current_task_coreset])
                         positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
-                        # negative_count = sum([x in self.negative_images[previous_query] for x in current_task_coreset])
                         smaller_proportion = min(positive_count / current_coreset_size,
                                                  1 - (positive_count / current_coreset_size))
                         if debug: debug_print(f'Computed counts and proportions')
@@ -292,7 +290,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                         return self.start_epoch(debug, depth + 1)
 
                     if debug: debug_print(f'Successfully generated coreset for current task')
-                    coreset = coreset.difference(set(current_task_coreset))
+                    image_set = image_set.difference(set(current_task_coreset))
 
                 self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
 
@@ -300,7 +298,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             self.current_epoch_queries.extend(list(zip(range(self.num_images),
                                                    itertools.cycle([self.query_order[self.current_query_index]]))))
         else:
-            self.current_epoch_queries.extend(list(zip(current_task_set,
+            self.current_epoch_queries.extend(list(zip(image_set,
                                                        itertools.cycle([self.query_order[self.current_query_index]]))))
 
         # print(self.current_query_index, len(self), len(self.current_epoch_queries))

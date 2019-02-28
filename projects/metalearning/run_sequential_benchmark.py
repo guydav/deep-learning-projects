@@ -67,6 +67,7 @@ parser.add_argument('--debug', action='store_true')
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    print(args)
     dataset_path = args.path_dataset
     batch_size = args.batch_size
     num_workers = args.num_workers

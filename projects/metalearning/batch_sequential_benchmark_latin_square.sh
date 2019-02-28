@@ -22,7 +22,7 @@ wandb login 9676e3cc95066e4865586082971f2653245f09b4
 
 for i in `seq 0 ${num_reps}`; do
     let "current_random_seed = ${random_seed} + ${i}"
-    python run_sequential_benchmark.py --name ${run_name} --dataset_random_seed ${current_random_seed} --use_latin_square --latin_square_index ${i} --latin_square_random_seed ${random_seed} ${@:5}
+    python run_sequential_benchmark.py --name ${run_name} --dataset_random_seed ${current_random_seed} --use_latin_square --latin_square_index ${current_random_seed} --latin_square_random_seed ${random_seed} ${@:5}
     sleep 1s;
 done
 

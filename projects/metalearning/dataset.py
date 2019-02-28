@@ -122,7 +122,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                  previous_query_coreset_size, query_order, coreset_size_per_query=False,
                  transform=None, start_index=0, end_index=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10),
-                 imbalance_threshold=0.25, num_sampling_attempts=10):
+                 imbalance_threshold=0.2, num_sampling_attempts=20):
         """
         Important API-wise:
         Call start_epoch whenever, well, you're starting a new epoch

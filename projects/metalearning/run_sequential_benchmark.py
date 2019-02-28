@@ -103,6 +103,7 @@ if __name__ == '__main__':
             latin_square_random.shuffle(latin_square)  # permute rows
             latin_square_random.shuffle(latin_square.T)  # permute cols
             query_order = latin_square[args.latin_square_index % latin_square.shape[0]]
+            query_order -= 1
 
         else:
             query_order = np.arange(10)

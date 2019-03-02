@@ -6,13 +6,13 @@
 #echo $test
 #
 #if [[ $# <= 3 ]];  then
-#    echo "Usage: ./batch_sequential_benchmark.sh <GPU ID> <Number of repetitions> <run id> <Dataset Random seed> [additional arguments to the internal script]"
+#    echo "Usage: ./batch_sequential_benchmark.sh <GPU ID> <start index> <end index> <run id> <Dataset Random seed> [additional arguments to the internal script]"
 #    exit 1
 #fi
 
 gpu_id=$1
 start_index=$2
-let "end_index = $3 - 1 + $2"
+let "end_index = $3 - 1"
 run_name=$4
 random_seed=$5
 

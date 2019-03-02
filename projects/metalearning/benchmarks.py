@@ -3,7 +3,7 @@ from .base_model import *
 
 def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold, threshold_all_queries=False,
                          num_epochs=100, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
-                         watch=True, debug=False):
+                         watch=True, debug=False, save_name='model'):
     if epochs_to_graph is None:
         epochs_to_graph = 10
 
@@ -88,6 +88,9 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
             print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({query_order[current_query_index]}), moving to the next query')
             train_dataloader.dataset.next_query()
             test_dataloader.dataset.next_query()
+
+            # Added saving on every time we hit criterion
+            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'{save_name}-query-{current_query_index}.pth'))
 
         if epoch % epochs_to_graph == 0:
             mid_train_plot(model, 1)

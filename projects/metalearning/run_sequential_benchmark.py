@@ -196,4 +196,5 @@ if __name__ == '__main__':
                          num_epochs=total_epochs - current_epoch,
                          epochs_to_graph=total_epochs + 1,
                          start_epoch=current_epoch,
-                         debug=args.debug)
+                         debug=args.debug,
+                         save_name=f'{args.name}-{dataset_random_seed}')

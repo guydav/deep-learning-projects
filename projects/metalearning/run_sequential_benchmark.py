@@ -55,7 +55,7 @@ parser.add_argument('--name')
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
-DEFAULT_MAX_EPOCHS = 600
+DEFAULT_MAX_EPOCHS = 1000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 parser.add_argument('--threshold_all_queries', type=int, default=1)
 

@@ -153,7 +153,7 @@ if __name__ == '__main__':
         conv_output_size=4480,
         mlp_layer_sizes=(512, 512, 512, 512),
         lr=learning_rate,
-        weight_decay=weight_decay,  # 1e-4,
+        weight_decay=weight_decay,
         use_lr_scheduler=False,
         conv_dropout=False,
         mlp_dropout=False,

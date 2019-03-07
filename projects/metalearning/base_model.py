@@ -431,12 +431,12 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
                 'Train Accuracy': np.mean(train_results['accuracies']),
                 'Train Loss': np.mean(train_results['losses']),
                 'Train AUC': np.mean(train_results['aucs']),
-                'Train Per-Query Accuracy (dict)': {int(query): np.mean(values) for query, values in
+                'Train Per-Query Accuracy (dict)': {str(query): np.mean(values) for query, values in
                                                     train_results['per_query_results'].items()},
                 'Test Accuracy': np.mean(test_results['accuracies']),
                 'Test Loss': np.mean(test_results['losses']),
                 'Test AUC': np.mean(test_results['aucs']),
-                'Test Per-Query Accuracy (dict)': {int(query): np.mean(values) for query, values in
+                'Test Per-Query Accuracy (dict)': {str(query): np.mean(values) for query, values in
                                                    test_results['per_query_results'].items()},
             }
             if model.compute_correct_rank:

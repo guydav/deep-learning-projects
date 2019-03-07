@@ -290,6 +290,7 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
         x = self.conv2(x)
         if self.mod_level == 2:
+            print(x.shape, query_mod.shape)
             x = x + query_mod[:, None, None]
         x = F.relu(x)
         x = self.batchNorm2(x)

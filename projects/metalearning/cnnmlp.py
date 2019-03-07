@@ -337,8 +337,8 @@ class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
         )
 
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
-        return TaskModulatingPoolingDropoutConvInputModel(self.mod_level, self.query_length,
-                                                          conv_filter_sizes, conv_dropout, conv_p_dropout)
+        return QueryModulatingPoolingDropoutConvInputModel(self.mod_level, self.query_length,
+                                                           conv_filter_sizes, conv_dropout, conv_p_dropout)
 
     def forward(self, img, query):
         x = self.conv(img, query)  # adding the query to be modulated

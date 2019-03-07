@@ -225,13 +225,17 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
     def next_query(self):
         self.current_query_index += 1
 
-    def start_epoch(self, debug=False, depth=0):
+    def start_epoch(self, debug=False):
         """
         Sample the images for each coreset query to be used for the current epoch
         """
-        self.current_epoch_queries = []
+        query_to_images = self._assign_images_to_queries(debug)
+        self._current_epoch_queries_from_dict(query_to_images)
 
-        if debug: debug_print('Starting start_epoch')
+    def _assign_images_to_queries(self, debug=False, depth=0):
+        if debug: debug_print('Starting _assign_images_to_queries')
+
+        query_to_images = {}
 
         if depth >= self.num_sampling_attempts:
             raise ValueError('Warning, exceeded maximum number of sampling attempts, this is not great')
@@ -251,8 +255,9 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
             # This would happen in our test loader:
             if self.previous_query_coreset_size == self.num_images:
-                self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                           itertools.cycle([previous_query]))))
+                # self.current_epoch_queries.extend(list(zip(range(self.num_images),
+                #                                            itertools.cycle([previous_query]))))
+                query_to_images[previous_query] = range(self.num_images)
 
             else:
                 if self.coreset_size_per_query:
@@ -292,24 +297,82 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                     if debug: debug_print(f'Successfully generated coreset for current task')
                     image_set = image_set.difference(set(current_task_coreset))
 
-                self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
+                # self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
+                query_to_images[previous_query] = current_task_coreset
 
+        current_query = self.query_order[self.current_query_index]
         if self.coreset_size_per_query:  # use the entire training set for the previous query
-            self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                   itertools.cycle([self.query_order[self.current_query_index]]))))
+            # self.current_epoch_queries.extend(list(zip(range(self.num_images),
+            #                                            itertools.cycle([current_query]))))
+            query_to_images[current_query] = range(self.num_images)
         else:
             if self.current_query_index == 0:
                 image_set = set(np.random.choice(self.num_images,
                                                  self.num_images - self.previous_query_coreset_size,
                                                  False))
 
-            self.current_epoch_queries.extend(list(zip(image_set,
-                                                       itertools.cycle([self.query_order[self.current_query_index]]))))
+            # self.current_epoch_queries.extend(list(zip(image_set,
+            #                                            itertools.cycle([current_query]))))
+            query_to_images[current_query] = image_set
 
-        # print(self.current_query_index, len(self), len(self.current_epoch_queries))
+        return query_to_images
+
+    def _current_epoch_queries_from_dict(self, query_to_images):
+        self.current_epoch_queries = []
+
+        for query, images in query_to_images.items():
+            self.current_epoch_queries.extend(list(zip(images,
+                                                       itertools.cycle([query]))))
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]
+
+
+class MAMLSequentialBenchmarkMetaLearningDataset(SequentialBenchmarkMetaLearningDataset):
+    def __init__(self, in_file, benchmark_dimension, random_seed,
+                 previous_query_coreset_size, query_order, coreset_size_per_query=False,
+                 transform=None, start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.2, num_sampling_attempts=20,
+                 meta_training_split=0.5, batch_size=1500):
+
+        super(MAMLSequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file, benchmark_dimension, random_seed, previous_query_coreset_size,
+            query_order, coreset_size_per_query, transform, start_index, end_index,
+            return_indices, num_dimensions, features_per_dimension,
+            imbalance_threshold, num_sampling_attempts)
+
+        self.meta_training_split = meta_training_split
+        self.batch_size = batch_size
+        self.train_query_to_images = {}
+        self.meta_train_query_to_images = {}
+
+        if int(self.num_images * self.meta_training_split) % batch_size != 0:
+            raise ValueError(f'Meta-training size should be even batches, and {self.num_images * self.meta_training_split} != 0 (mod {self.batch.size})')
+
+    def start_epoch(self, debug=False):
+        """
+        Sample the images for each coreset query to be used for the current epoch
+        """
+        query_to_images = self._assign_images_to_queries(debug)
+
+        # split each queries images between training and meta-training
+        self.train_query_to_images = {}
+        self.meta_train_query_to_images = {}
+
+        for query, images in query_to_images:
+            query_images = list(images)
+            mid_point = len(query_images) // 2
+            np.random.shuffle(query_images)
+
+            self.train_query_to_images[query] = query_images[:mid_point]
+            self.meta_train_query_to_images[query] = query_images[mid_point:]
+
+        self._current_epoch_queries_from_dict(self.train_query_to_images)
+
+    def start_meta_training(self, debug=False):
+        if debug: debug_print('Starting meta-training')
+        self._current_epoch_queries_from_dict(self.meta_train_query_to_images)
 
 
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,

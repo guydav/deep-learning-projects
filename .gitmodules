@@ -1,3 +1,3 @@
-[submodule "projects/metalearning/MAML-Pytorch"]
-	path = projects/metalearning/MAML-Pytorch
+[submodule "projects/metalearning/maml"]
+	path = projects/metalearning/maml
 	url = https://github.com/guydav/MAML-Pytorch

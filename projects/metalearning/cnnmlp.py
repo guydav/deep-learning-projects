@@ -276,12 +276,13 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
         self.p_dropout = p_dropout
 
     def forward(self, img, query):
-        query_mod = self.query_mod_layer(query)  # adding two fake dimensions for the space
+        # adding two fake dimensions for the spatial ones => [b, c, w, h]
+        query_mod = self.query_mod_layer(query)[:, :, None, None]
 
         """convolution"""
         x = self.conv1(img)
         if self.mod_level == 1:
-            x = x + query_mod[:, None, None]
+            x = x + query_mod
         x = F.relu(x)
         x = self.batchNorm1(x)
         x = F.max_pool2d(x, 2)
@@ -290,8 +291,7 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
         x = self.conv2(x)
         if self.mod_level == 2:
-            print(x.shape, query_mod.shape)
-            x = x + query_mod[:, None, None]
+            x = x + query_mod
         x = F.relu(x)
         x = self.batchNorm2(x)
         x = F.max_pool2d(x, 2)
@@ -300,7 +300,7 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
         x = self.conv3(x)
         if self.mod_level == 3:
-            x = x + query_mod[:, None, None]
+            x = x + query_mod
         x = F.relu(x)
         x = self.batchNorm3(x)
         x = F.max_pool2d(x, 2)
@@ -309,7 +309,7 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
         x = self.conv4(x)
         if self.mod_level == 4:
-            x = x + query_mod[:, None, None]
+            x = x + query_mod
         x = F.relu(x)
         x = self.batchNorm4(x)
         x = F.max_pool2d(x, 2)
@@ -339,7 +339,7 @@ class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
 
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
         return QueryModulatingPoolingDropoutConvInputModel(self.mod_level, self.query_length,
-                                                           conv_filter_sizes, conv_dropout, conv_p_dropout)
+                                                          conv_filter_sizes, conv_dropout, conv_p_dropout)
 
     def forward(self, img, query):
         x = self.conv(img, query)  # adding the query to be modulated

@@ -180,7 +180,7 @@ class SmallerDropoutFCOutputModel(nn.Module):
 
 
 class PoolingDropoutCNNMLP(BasicModel):
-    def __init__(self, query_length=21, conv_filter_sizes=(16, 24, 32, 40),
+    def __init__(self, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),
                  mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
@@ -193,9 +193,7 @@ class PoolingDropoutCNNMLP(BasicModel):
                                                    compute_correct_rank=compute_correct_rank)
         
         self.query_length = query_length
-        self.conv = PoolingDropoutConvInputModel(conv_filter_sizes,
-                                                 conv_dropout,
-                                                 conv_p_dropout)
+        self.conv = self._create_conv_module(conv_filter_sizes, conv_dropout, conv_p_dropout)
         self.fc1 = nn.Linear(conv_output_size + query_length, mlp_layer_sizes[0])  # query concatenated to all
         output_size = num_classes
         
@@ -208,15 +206,23 @@ class PoolingDropoutCNNMLP(BasicModel):
         else:
             fc_output_func = lambda x: F.log_softmax(x, dim=1)
 
-        self.fcout = SmallerDropoutFCOutputModel(mlp_layer_sizes,
-                                                 mlp_dropout,
-                                                 mlp_p_dropout,
-                                                 output_func=fc_output_func,
-                                                 output_size=output_size)
+        self.fcout = self._create_fc_module(fc_output_func, mlp_dropout, mlp_layer_sizes, mlp_p_dropout, output_size)
         self.lr = lr
         self.weight_decay = weight_decay
         self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
+
+    def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
+        return PoolingDropoutConvInputModel(conv_filter_sizes,
+                                            conv_dropout,
+                                            conv_p_dropout)
+
+    def _create_fc_module(self, fc_output_func, mlp_dropout, mlp_layer_sizes, mlp_p_dropout, output_size):
+        return SmallerDropoutFCOutputModel(mlp_layer_sizes,
+                                           mlp_dropout,
+                                           mlp_p_dropout,
+                                           output_func=fc_output_func,
+                                           output_size=output_size)
 
     def _create_optimizer(self):
         self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
@@ -233,6 +239,110 @@ class PoolingDropoutCNNMLP(BasicModel):
 
     def forward(self, img, query=None):
         x = self.conv(img)  ## x = (16 x 24 x 15 x 20)
+        """fully connected layers"""
+        x = x.view(x.size(0), -1)
+
+        x_ = x
+        if self.query_length > 0:
+            x_ = torch.cat((x_, query), 1)  # Concat query - as a float?
+
+        x_ = self.fc1(x_)
+        x_ = F.relu(x_)
+
+        return self.fcout(x_)
+
+
+class TaskModulatingPoolingDropoutConvInputModel(nn.Module):
+    def __init__(self, mod_level, query_length=30, filter_sizes=(16, 24, 32, 40),
+                 dropout=True, p_dropout=0.2):
+        super(TaskModulatingPoolingDropoutConvInputModel, self).__init__()
+
+        if mod_level < 1 or mod_level > 4:
+            raise ValueError('Task modulation level should be between 1 and 4 inclusive')
+
+        self.mod_level = mod_level
+        self.query_mod_layer = nn.Linear(query_length, filter_sizes[self.mod_level - 1])
+
+        self.conv1 = nn.Conv2d(3, filter_sizes[0], 3, stride=1, padding=1)
+        self.batchNorm1 = nn.BatchNorm2d(filter_sizes[0])
+        self.conv2 = nn.Conv2d(filter_sizes[0], filter_sizes[1], 3, stride=1, padding=1)
+        self.batchNorm2 = nn.BatchNorm2d(filter_sizes[1])
+        self.conv3 = nn.Conv2d(filter_sizes[1], filter_sizes[2], 3, stride=1, padding=1)
+        self.batchNorm3 = nn.BatchNorm2d(filter_sizes[2])
+        self.conv4 = nn.Conv2d(filter_sizes[2], filter_sizes[3], 3, stride=1, padding=1)
+        self.batchNorm4 = nn.BatchNorm2d(filter_sizes[3])
+
+        self.dropout = dropout
+        self.p_dropout = p_dropout
+
+    def forward(self, img, query):
+        query_mod = self.query_mod_layer(query)[:, None, None]  # adding two fake dimensions for the space
+
+        """convolution"""
+        x = self.conv1(img)
+        if self.mod_level == 1:
+            x = x + query_mod
+        x = F.relu(x)
+        x = self.batchNorm1(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv2(x)
+        if self.mod_level == 2:
+            x = x + query_mod
+        x = F.relu(x)
+        x = self.batchNorm2(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv3(x)
+        if self.mod_level == 3:
+            x = x + query_mod
+        x = F.relu(x)
+        x = self.batchNorm3(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv4(x)
+        if self.mod_level == 4:
+            x = x + query_mod
+        x = F.relu(x)
+        x = self.batchNorm4(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        return x
+
+
+class TaskModulatingCNNMLP(PoolingDropoutCNNMLP):
+    def __init__(self, mod_level, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
+                 conv_dropout=True, conv_p_dropout=0.2,
+                 mlp_layer_sizes=(256, 256, 256, 256),
+                 mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
+                 conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
+                 use_mse=False, loss=None, compute_correct_rank=False,
+                 name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
+
+        self.mod_level = mod_level
+
+        super(TaskModulatingCNNMLP, self).__init__(
+            query_length, conv_filter_sizes, conv_dropout, conv_p_dropout,
+            mlp_layer_sizes, mlp_dropout, mlp_p_dropout, use_lr_scheduler, lr_scheduler_patience,
+            conv_output_size, lr, weight_decay, num_classes, use_mse, loss,
+            compute_correct_rank, name, save_dir
+        )
+
+    def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
+        return TaskModulatingPoolingDropoutConvInputModel(self.mod_level, self.query_length,
+                                                          conv_filter_sizes, conv_dropout, conv_p_dropout)
+
+    def forward(self, img, query):
+        x = self.conv(img, query)  # adding the query to be modulated
+        # x = (16 x 24 x 15 x 20)
         """fully connected layers"""
         x = x.view(x.size(0), -1)
 

@@ -90,6 +90,7 @@ if __name__ == '__main__':
     if dataset_random_seed is None:
         dataset_random_seed = np.random.randint(2 ** 32)
 
+    torch.manual_seed(dataset_random_seed)
     torch.cuda.manual_seed_all(dataset_random_seed)
 
     train_coreset_size = args.train_coreset_size

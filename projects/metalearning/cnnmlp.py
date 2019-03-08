@@ -257,8 +257,8 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
                  dropout=True, p_dropout=0.2):
         super(QueryModulatingPoolingDropoutConvInputModel, self).__init__()
 
-        if mod_level < 1 or mod_level > 4:
-            raise ValueError('Query modulation level should be between 1 and 4 inclusive')
+        if mod_level < 0 or mod_level > 4:
+            raise ValueError('Query modulation level should be between 0 and 4 inclusive')
 
         self.mod_level = mod_level
         self.query_mod_layer = nn.Linear(query_length, filter_sizes[self.mod_level - 1])
@@ -277,7 +277,8 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
     def forward(self, img, query):
         # adding two fake dimensions for the spatial ones => [b, c, w, h]
-        query_mod = self.query_mod_layer(query)[:, :, None, None]
+        if self.mod_level > 0:
+            query_mod = self.query_mod_layer(query)[:, :, None, None]
 
         """convolution"""
         x = self.conv1(img)

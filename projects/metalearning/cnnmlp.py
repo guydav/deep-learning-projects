@@ -277,6 +277,7 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
     def forward(self, img, query):
         # adding two fake dimensions for the spatial ones => [b, c, w, h]
+        # checking for > 0 such that mod_level = 0 is the baseline model
         if self.mod_level > 0:
             query_mod = self.query_mod_layer(query)[:, :, None, None]
 

@@ -119,8 +119,9 @@ def debug_print(message):
 
 class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
     def __init__(self, in_file, benchmark_dimension, random_seed,
-                 previous_query_coreset_size, query_order, coreset_size_per_query=False,
-                 transform=None, start_index=0, end_index=None, return_indices=True,
+                 previous_query_coreset_size, query_order, single_dimension=True,
+                 coreset_size_per_query=False, transform=None,
+                 start_index=0, end_index=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10),
                  imbalance_threshold=0.2, num_sampling_attempts=20):
         """
@@ -143,28 +144,30 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
             in_file, transform, start_index, end_index, None, return_indices,
             num_dimensions, features_per_dimension)
 
-        if benchmark_dimension >= num_dimensions:
-            raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
+        # In the case it's a single-dimension example, validate parameters
+        if single_dimension:
+            if benchmark_dimension >= num_dimensions:
+                raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
 
-        self.benchmark_dimension = benchmark_dimension
+            if len(query_order) != features_per_dimension[benchmark_dimension]:
+                raise ValueError(
+                    f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
+
+            dimension_sizes = list(np.cumsum(features_per_dimension))
+            dimension_sizes.insert(0, 0)
+
+            if np.any(np.array(query_order) < dimension_sizes[benchmark_dimension]) or \
+                    np.any(np.array(query_order) >= dimension_sizes[benchmark_dimension + 1]):
+                raise ValueError(
+                    f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
+
+
         self.previous_query_coreset_size = previous_query_coreset_size
         self.coreset_size_per_query = coreset_size_per_query
         self.random_seed = random_seed
         np.random.seed(random_seed)
         self.imbalance_threshold = imbalance_threshold
         self.num_sampling_attempts = num_sampling_attempts
-
-        if len(query_order) != features_per_dimension[benchmark_dimension]:
-            raise ValueError(f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
-
-        dimension_sizes = list(np.cumsum(features_per_dimension))
-        dimension_sizes.insert(0, 0)
-
-        if np.any(np.array(query_order) < dimension_sizes[benchmark_dimension]) or \
-                np.any(np.array(query_order) >= dimension_sizes[benchmark_dimension + 1]):
-            raise ValueError(
-                f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
-
         self.query_order = query_order
         self.current_query_index = 0
         self._cache_images_by_query()

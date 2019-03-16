@@ -117,6 +117,7 @@ if __name__ == '__main__':
                                        random_seed=dataset_random_seed,
                                        query_order=query_order,
                                        single_dimension=False,
+                                       benchmark_dimension=None,
                                    ),
                                    train_dataset_kwargs=dict(
                                        previous_query_coreset_size=train_coreset_size,

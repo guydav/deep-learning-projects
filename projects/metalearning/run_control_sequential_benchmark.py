@@ -96,9 +96,6 @@ if __name__ == '__main__':
                                                                      True)
                                            for _ in range(3)]])
         query_order = queries_per_dimension.flatten('F')[:args.query_order_length] + cycled_dimension
-        print(script_random_seed, ':', current_permutation, ':', query_order)
-        import sys; sys.exit(1)
-
 
     accuracy_threshold = args.accuracy_threshold
 

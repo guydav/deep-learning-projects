@@ -28,9 +28,13 @@ QUERY_NAMES = ['blue', 'brown', 'cyan', 'gray', 'green',
                'polka', 'rubber', 'rug', 'tiles', 'wood_plank']
 
 COLOR = 'color'
+COLOR_INDEX = 0
 SHAPE = 'shape'
+SHAPE_INDEX = 1
 TEXTURE = 'texture'
+TEXTURE_INDEX = 2
 COMBINED = 'combined'
+COMBINED_INDEX = 3
 DIMENSION_NAMES = [COLOR, SHAPE, TEXTURE]
 
 RESULT_SET_FIELDS = ['name', 'mean', 'std']

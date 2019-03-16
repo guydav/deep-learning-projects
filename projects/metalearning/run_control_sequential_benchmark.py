@@ -95,7 +95,7 @@ if __name__ == '__main__':
                                                                      int(np.ceil(args.query_order_length / 3)),
                                                                      True)
                                            for _ in range(3)]])
-        query_order = queries_per_dimension.flatten('F') + cycled_dimension
+        query_order = queries_per_dimension.flatten('F')[:args.query_order_length] + cycled_dimension
         print(script_random_seed, ':', current_permutation, ':', query_order)
         import sys; sys.exit(1)
 

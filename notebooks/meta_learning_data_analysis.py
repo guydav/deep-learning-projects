@@ -3,6 +3,7 @@ import pandas as pd
 import scipy
 from scipy import stats
 from scipy.special import factorial
+from scipy.stats import binom_test, wilcoxon
 
 import os
 import pickle
@@ -228,3 +229,118 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=1000):
     
     return analysis
 
+
+def sign_test(values):
+    n = len(values)
+    row_faster_results = np.empty((n, n))
+    row_faster_results.fill(np.nan)
+    
+    col_faster_results = np.empty((n, n))
+    col_faster_results.fill(np.nan)
+    
+    wilcoxon_statistics = np.empty((n, n))
+    wilcoxon_statistics.fill(np.nan)
+    
+    wilcoxon_p_values = np.empty((n, n))
+    wilcoxon_p_values.fill(np.nan)
+    
+    for row in range(n):
+        for col in range(row + 1, n):
+            row_means = values[row].mean
+            row_means = row_means[~np.isnan(row_means)]
+            col_means = values[col].mean
+            col_means = col_means[~np.isnan(col_means)]
+    
+            # Run both explicit comparisons, to account for the possibility of ties
+            row_faster = np.sum(row_means <col_means )
+            row_faster_results[row, col] = row_faster
+            
+            col_faster = np.sum(row_means > col_means)
+            col_faster_results[row, col] = col_faster
+            
+            s, p = wilcoxon(row_means, col_means)
+            wilcoxon_statistics[row, col] = s
+            wilcoxon_p_values[row, col] = p
+            
+    return row_faster_results, col_faster_results, wilcoxon_statistics, wilcoxon_p_values
+
+
+MODULATION_LEVELS = ['None'] + [str(i) for i in range(1, 5)] 
+SIGN_TEST_PRINT_HEADERS = ['Modulation level'] + [str(i) for i in range(1, 5)] 
+
+
+def pretty_print_sign_test_results(row_faster_results, col_faster_results, 
+                                   wilcoxon_statistics=None, wilcoxon_p_values=None,
+                                   higher_better=False, **kwargs):
+    n = row_faster_results.shape[0]
+    print_results = [[''] * n for _ in range(n)]
+    if wilcoxon_statistics is not None:
+        wilcoxon_results = [[''] * n for _ in range(n)]
+    
+    for row in range(n):
+        for col in range(row + 1, n):
+            row_val = int(row_faster_results[row, col])
+            col_val = int(col_faster_results[row, col])
+            if higher_better:
+                row_val, col_val = col_val, row_val
+                
+            result = col_val - row_val
+            n_binom = col_val + row_val
+            p = binom_test(abs(result), n_binom)
+            
+            print_results[row][col] = f'{result} ({col_val}-{row_val}, n={n_binom}, p={p:.3f})'
+            
+            if wilcoxon_statistics is not None:
+                wilcoxon_results[row][col] = f'\n{wilcoxon_statistics[row, col]:.4f}, {wilcoxon_p_values[row, col]:.4f}'
+            
+    tab_args = dict(tablefmt='fancy_grid')
+    tab_args.update(kwargs)
+            
+    print_results = [[MODULATION_LEVELS[i]] + row[1:] for i, row in enumerate(print_results)]
+    print(tabulate.tabulate(print_results[:-1], SIGN_TEST_PRINT_HEADERS, **tab_args))
+    
+    if wilcoxon_statistics is not None:
+        wilcoxon_results = [[MODULATION_LEVELS[i]] + row[1:] for i, row in enumerate(wilcoxon_results)]
+        print(tabulate.tabulate(wilcoxon_results[:-1], SIGN_TEST_PRINT_HEADERS, **tab_args))
+
+        
+def sign_test_with_sem(values, sample_sizes):
+    n = len(values)
+    row_faster_results = np.empty((n, n))
+    row_faster_results.fill(np.nan)
+    
+    col_faster_results = np.empty((n, n))
+    col_faster_results.fill(np.nan)
+    
+    wilcoxon_statistics = np.empty((n, n))
+    wilcoxon_statistics.fill(np.nan)
+    
+    wilcoxon_p_values = np.empty((n, n))
+    wilcoxon_p_values.fill(np.nan)
+    
+    for row in range(n):
+        for col in range(row, n):
+            row_means = values[row].mean
+            row_means = row_means[~np.isnan(row_means)]
+            row_sems = values[row].std / (sample_sizes[row] ** 0.5)
+            row_sems = row_sems[~np.isnan(row_sems)]
+            
+            col_means = values[col].mean
+            col_means = col_means[~np.isnan(col_means)]
+            col_sems = values[col].std / (sample_sizes[col] ** 0.5)
+            col_sems = col_sems[~np.isnan(col_sems)]
+    
+            # Run both explicit comparisons, to account for the possibility of ties
+            row_faster_results[row, col] = np.sum(row_means + row_sems < col_means - col_sems)
+            col_faster_results[row, col] = np.sum(row_means - row_sems > col_means + col_sems)
+            
+            signs = row_means < col_means
+            signs[signs == 0] = -1
+            
+            shifted_row_means = row_means + np.multiply(row_sems, signs)
+            shifted_col_means = col_means + np.multiply(col_sems, -1 * signs)
+            s, p = wilcoxon(shifted_row_means, shifted_col_means)
+            wilcoxon_statistics[row, col] = s
+            wilcoxon_p_values[row, col] = p
+            
+    return row_faster_results, col_faster_results, wilcoxon_statistics, wilcoxon_p_values

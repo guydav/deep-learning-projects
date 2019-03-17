@@ -12,7 +12,7 @@ DEFAULT_COLORMAP = 'tab10'
 
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
-                                 font_dict=None, x_label=None, y_label=None, title=None, hline_y=None, hline_style=None):
+                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, title=None, hline_y=None, hline_style=None):
     if font_dict is None:
         font_dict = {}
         
@@ -69,6 +69,9 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         y_label = f'{results.name}'
     ax.set_ylabel(y_label, **font_dict)
     
+    if y_label_right:
+        ax.yaxis.set_label_position("right")
+    
     if title is None:
         # title = f'{results.name} vs. number of tasks trained'
         title = 'Number of times trained on'
@@ -76,7 +79,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     
     
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
-                                 font_dict=None, x_label=None, y_label=None, title=None, hline_y=None, hline_style=None):
+                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, title=None, hline_y=None, hline_style=None):
     if font_dict is None:
         font_dict = {}
         
@@ -131,13 +134,19 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         y_label = f'{results.name}'
     ax.set_ylabel(y_label, **font_dict)
     
+    if y_label_right:
+        ax.yaxis.set_label_position("right")
+    
     if title is None:
         title = f'Number of tasks trained on'
     ax.set_title(title, **font_dict)
 
+    
+DEFAULT_Y_LABEL = 'Log(examples to criterion)'
+    
 
 def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=None, log_x=False, log_y=None,
-                                          sem_n=1, shade_error=False, font_dict=None,
+                                          sem_n=1, shade_error=False, font_dict=None, plot_y_label=DEFAULT_Y_LABEL,
                                           times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP):
     NROWS = 4
     NCOLS = 2
@@ -176,18 +185,18 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         if dimension_index == NROWS - 1:
             x_label = None  # sets the default x-label for this plot
 
-        y_label = dimension_name.capitalize()
+        y_label = plot_y_label
         
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
 
         num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 2)
-        y_label = ''
+        y_label = dimension_name.capitalize()
         
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True, title=title)
         
     plt.show()
 
@@ -202,7 +211,7 @@ PER_MODEL_ROW_HEIGHT = 6
 def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, super_title,
                                  font_dict=None, colormap=DEFAULT_COLORMAP, 
                                  ylim=None, log_x=True, log_y=True, shade_error=True, 
-                                 sem_n=1, baseline_sem_n=1, data_index=None):
+                                 sem_n=1, baseline_sem_n=1, data_index=None, plot_y_label=DEFAULT_Y_LABEL):
     
     plt.figure(figsize=(PER_MODEL_NCOLS * (PER_MODEL_COL_WIDTH + 1), 
                         PER_MODEL_NROWS * PER_MODEL_ROW_HEIGHT))
@@ -234,11 +243,16 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
         x_label = ''
 
         y_label = ''
+        y_label_right = False
         if dimension_index == 0:
+            y_label = plot_y_label
+        elif dimension_index == 3:
             y_label = f'No query\nmodulation'
+            y_label_right = True
 
         plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
-                  sem_n=baseline_sem_n[dimension_index], font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
+                  sem_n=baseline_sem_n[dimension_index], font_dict=font_dict, 
+                  x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title)
     
     # plot per query
     for replication_level, replication_analyses in per_query_replication.items():
@@ -257,11 +271,16 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
                 x_label = None
                 
             y_label = ''
+            y_label_right = False
             if dimension_index == 0:
+                y_label = plot_y_label
+            elif dimension_index == 3:
                 y_label = f'Query modulation\nat conv-{replication_level}'
+                y_label_right = True
     
             plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
-                      sem_n=sem_n[dimension_index], font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
+                      sem_n=sem_n[dimension_index], font_dict=font_dict, 
+                      x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title)
         
     plt.show()
     
@@ -380,14 +399,14 @@ def comparison_plot_per_model(baseline, per_query_replication, plot_func, super_
     
     
 DEFAULT_COMPARISON_HLINE_STYLE = dict(linestyle='--', linewidth=4, color='black', alpha=0.25)
-    
+
     
 def combined_comparison_plots(baseline, per_query_replication, super_title,
                               comparison_mod_level, dimension_index=COMBINED_INDEX, comparison_func=np.subtract,
                               font_dict=None, comparison_first=False, ylim=None, data_index=None, 
                               log_x=True, log_y=True, shade_error=True, sem_n=1, baseline_sem_n=1, 
                               times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
-                              null_hline_y=None, null_hline_style=None):
+                              null_hline_y=None, null_hline_style=None, plot_y_label=''):
     
     if comparison_mod_level < 0 or comparison_mod_level > 4:
         raise ValueError('Comparison model level should be between 0 and 4 inclusive')
@@ -450,7 +469,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
 
         title = None  # use the default title
         x_label = ''
-        y_label = f'No query\nmodulation'
+        y_label = plot_y_label
 
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
@@ -458,11 +477,11 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style)
 
         num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 2)
-        y_label = ''
+        y_label = f'No query\nmodulation'
 
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
                                       title=title, hline_y=null_hline_y, hline_style=null_hline_style)
     
     # plot per query
@@ -496,7 +515,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         if replication_level_for_axes + 1 == COMPARISON_NROWS:
             x_label = None  # use the default x-label
 
-        y_label = f'Query modulation\nat conv-{replication_level}'
+        y_label = plot_y_label
 
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
@@ -505,11 +524,11 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
 
         num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 
                                            replication_level_for_axes * COMPARISON_NCOLS + 2)
-        y_label = ''
+        y_label = f'Query modulation\nat conv-{replication_level}'
 
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
                                       title=title, hline_y=null_hline_y, hline_style=null_hline_style)
         
     plt.show()

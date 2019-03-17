@@ -78,7 +78,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
     
     if x_label is None:
-        x_label = f'{log_x and "log(" or ""}Number of times trained{log_x and ")" or ""}'
+        x_label = f'{log_x and "Log(" or ""}Number of times trained{log_x and ")" or ""}'
     ax.set_xlabel(x_label, **font_dict)
         
     if y_label is None:
@@ -158,7 +158,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
         
     if x_label is None:
-        x_label = f'{log_x and "log(" or ""}Number of tasks trained{log_x and ")" or ""}'    
+        x_label = f'{log_x and "Log(" or ""}Number of tasks trained{log_x and ")" or ""}'    
     ax.set_xlabel(x_label, **font_dict)
         
     if y_label is None:

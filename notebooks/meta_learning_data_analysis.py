@@ -284,11 +284,11 @@ def pretty_print_sign_test_results(row_faster_results, col_faster_results,
             if higher_better:
                 row_val, col_val = col_val, row_val
                 
-            result = col_val - row_val
+            result = max(col_val, row_val)
             n_binom = col_val + row_val
-            p = binom_test(abs(result), n_binom)
+            p = binom_test(max(col_val, row_val), n_binom)
             
-            print_results[row][col] = f'{result} ({col_val}-{row_val}, n={n_binom}, p={p:.3f})'
+            print_results[row][col] = f'{result} ({col_val}|{row_val}, n={n_binom}, p={p:.3f}{p < 0.05 and "*" or ""}{p < 0.01 and "*" or ""})'
             
             if wilcoxon_statistics is not None:
                 wilcoxon_results[row][col] = f'\n{wilcoxon_statistics[row, col]:.4f}, {wilcoxon_p_values[row, col]:.4f}'

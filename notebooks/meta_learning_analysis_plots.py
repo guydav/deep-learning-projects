@@ -3,16 +3,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib import path as mpath
-
+from matplotlib import ticker
 import numpy as np
 
 from meta_learning_data_analysis import *
 
+
 DEFAULT_COLORMAP = 'tab10'
+DEFAULT_LOG_SCALE_CUSTOM_TICKS = (4500, 9000, 22500, 45000, 90000, 225000, 450000)
 
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
-                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, title=None, hline_y=None, hline_style=None):
+                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, 
+                                 title=None, hline_y=None, hline_style=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
     if font_dict is None:
         font_dict = {}
         
@@ -31,10 +34,10 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         y_means = np.diag(results.mean, task)
         y_stds = np.diag(results.std, task) / (sem_n ** 0.5)
         
-        ax.plot(x_values, y_means, color=colors(task / 10))
+        ax.plot(x_values, y_means, color=colors(task / num_points))
         if shade_error:
             ax.fill_between(x_values, y_means - y_stds, y_means + y_stds,
-                            color=colors(task / 10), alpha=0.25)
+                            color=colors(task / num_points), alpha=0.25)
             
     if hline_y is not None:
         if hline_style is None:
@@ -48,18 +51,31 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     if log_x:
         ax.set_xscale("log", nonposx='clip')
     
+    ax.set_xticks(np.arange(num_points) + 1)
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    
     if log_y:
 #         ax.set_yscale("log", nonposy='clip')
         y_min, y_max = ax.get_ylim()
-        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
-        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
+#        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
+#        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
         
-        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
-        y_ticks = np.log(10) * y_powers_10
-        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+#        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
+#        y_ticks = np.log(10) * y_powers_10
+#        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+
+        # Trying y-ticks at fixed intervals
+        # real_y_min = np.exp(y_min)
+        # real_y_max = np.exp(y_max)
+        
+        # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
+        # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
+        
+        real_y_ticks = log_y_custom_ticks
+        y_ticks = np.log(real_y_ticks)
         
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels(y_tick_labels)
+        ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
     
     if x_label is None:
         x_label = f'{log_x and "log(" or ""}Number of times trained{log_x and ")" or ""}'
@@ -79,7 +95,8 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     
     
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
-                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, title=None, hline_y=None, hline_style=None):
+                                 font_dict=None, x_label=None, y_label=None, y_label_right=False, 
+                                  title=None, hline_y=None, hline_style=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
     if font_dict is None:
         font_dict = {}
         
@@ -89,17 +106,18 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     
 #     ax.scatter(nonzero_cols + 1, results.mean, 
 #                                  color=[colors(x / 10) for x in abs(nonzero_cols - nonzero_rows)])
+
     for task in range(num_points):
         x_values = np.arange(task + 1, num_points + 1)
 #         y_means = np.diag(results.mean, task)
 #         y_stds = np.diag(results.std, task) / (sem_n ** 0.5)
         y_means = results.mean[task, task:]
         y_stds = results.std[task, task:] / (sem_n ** 0.5)
-        ax.scatter(x_values, y_means, color=colors(task / 10))
-        ax.plot(x_values, y_means, color=colors(task / 10))
+        ax.scatter(x_values, y_means, color=colors(task / num_points))
+        ax.plot(x_values, y_means, color=colors(task / num_points))
         if shade_error:
             ax.fill_between(x_values, y_means - y_stds, y_means + y_stds,
-                            color=colors(task / 10), alpha=0.25)
+                            color=colors(task / num_points), alpha=0.25)
             
     if hline_y is not None:
         if hline_style is None:
@@ -109,22 +127,35 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     
     if ylim is not None:
         ax.set_ylim(ylim)
-    
+
     if log_x:
         ax.set_xscale("log", nonposx='clip')
+    
+    ax.set_xticks(np.arange(num_points) + 1)
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
         
     if log_y:
 #         ax.set_yscale("log", nonposy='clip')
         y_min, y_max = ax.get_ylim()
-        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
-        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
+#        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
+#        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
         
-        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
-        y_ticks = np.log(10) * y_powers_10
-        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+#        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
+#        y_ticks = np.log(10) * y_powers_10
+#        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+
+        # Trying y-ticks at fixed intervals
+        # real_y_min = np.exp(y_min)
+        # real_y_max = np.exp(y_max)
+        
+        # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
+        # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
+        
+        real_y_ticks = log_y_custom_ticks
+        y_ticks = np.log(real_y_ticks)
         
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels(y_tick_labels)
+        ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
         
     if x_label is None:
         x_label = f'{log_x and "log(" or ""}Number of tasks trained{log_x and ")" or ""}'    
@@ -169,8 +200,11 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
     if not hasattr(sem_n, '__len__'):
         sem_n = [sem_n] * len(CONDITION_ANALYSES_FIELDS)
         
-    times_trained_colors = plt.get_cmap(times_trained_colormap)
-    tasks_trained_colors = plt.get_cmap(tasks_trained_colormap)
+    if isinstance(times_trained_colormap, str):
+        times_trained_colormap = plt.get_cmap(times_trained_colormap)
+        
+    if isinstance(tasks_trained_colormap, str):
+        tasks_trained_colormap = plt.get_cmap(tasks_trained_colormap)
         
     for dimension_index, dimension_name in enumerate(CONDITION_ANALYSES_FIELDS):
         num_times_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 1)
@@ -187,14 +221,14 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
 
         y_label = plot_y_label
         
-        examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
+        examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
 
         num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 2)
         y_label = dimension_name.capitalize()
         
-        examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
+        examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                       font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True, title=title)
         
@@ -215,7 +249,7 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
     
     plt.figure(figsize=(PER_MODEL_NCOLS * (PER_MODEL_COL_WIDTH + 1), 
                         PER_MODEL_NROWS * PER_MODEL_ROW_HEIGHT))
-    plt.subplots_adjust(top=0.94, hspace=0.25, wspace=0.15)
+    plt.subplots_adjust(top=0.94, hspace=0.25, wspace=0.25)
     
     if font_dict is None:
         font_dict = {}

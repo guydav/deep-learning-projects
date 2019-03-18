@@ -10,7 +10,7 @@ from meta_learning_data_analysis import *
 
 
 DEFAULT_COLORMAP = 'tab10'
-DEFAULT_LOG_SCALE_CUSTOM_TICKS = (4500, 9000, 22500, 45000, 90000, 225000, 450000)
+DEFAULT_LOG_SCALE_CUSTOM_TICKS = np.power(2, np.arange(8)) * 4000  # previously: (4500, 9000, 22500, 45000, 90000, 225000, 450000)
 
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
@@ -178,7 +178,8 @@ DEFAULT_Y_LABEL = 'Log(examples to criterion)'
 
 def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=None, log_x=False, log_y=None,
                                           sem_n=1, shade_error=False, font_dict=None, plot_y_label=DEFAULT_Y_LABEL,
-                                          times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP):
+                                          times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
+                                          log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
     NROWS = 4
     NCOLS = 2
     COL_WIDTH = 5
@@ -223,14 +224,16 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                     font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
+                                     font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                     title=title, log_y_custom_ticks=log_y_custom_ticks)
 
         num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 2)
         y_label = dimension_name.capitalize()
         
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True, title=title)
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True, 
+                                      title=title, log_y_custom_ticks=log_y_custom_ticks)
         
     plt.show()
 

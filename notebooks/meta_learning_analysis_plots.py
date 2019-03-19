@@ -1,4 +1,6 @@
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.axes_grid1.colorbar import colorbar
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
@@ -15,9 +17,13 @@ DEFAULT_LOG_SCALE_CUSTOM_TICKS = np.power(2, np.arange(8)) * 4000  # previously:
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                 title=None, hline_y=None, hline_style=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
+                                 title=None, hline_y=None, hline_style=None, 
+                                 log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None):
     if font_dict is None:
         font_dict = {}
+        
+    if title_font_dict is None:
+        title_font_dict = font_dict.copy()
         
     num_points = results.mean.shape[0]
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
@@ -91,14 +97,19 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     if title is None:
         # title = f'{results.name} vs. number of tasks trained'
         title = 'Number of times trained on'
-    ax.set_title(title, **font_dict)
+        
+    ax.set_title(title, **title_font_dict)
     
     
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                  title=None, hline_y=None, hline_style=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
+                                  title=None, hline_y=None, hline_style=None, 
+                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None):
     if font_dict is None:
         font_dict = {}
+        
+    if title_font_dict is None:
+        title_font_dict = font_dict.copy()
         
     num_points = results.mean.shape[0]
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
@@ -170,7 +181,8 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     
     if title is None:
         title = f'Number of tasks trained on'
-    ax.set_title(title, **font_dict)
+        
+    ax.set_title(title, **title_font_dict)
 
     
 DEFAULT_Y_LABEL = 'Log(examples to criterion)'
@@ -179,19 +191,22 @@ DEFAULT_Y_LABEL = 'Log(examples to criterion)'
 def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=None, log_x=False, log_y=None,
                                           sem_n=1, shade_error=False, font_dict=None, plot_y_label=DEFAULT_Y_LABEL,
                                           times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
-                                          log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS):
-    NROWS = 4
-    NCOLS = 2
-    COL_WIDTH = 5
+                                          log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None):
+    NROWS = 2
+    NCOLS = 4
+    COL_WIDTH = 6
     ROW_HEIGHT = 5 
     WIDTH_SPACING = 1
     HEIGHT_SPACING = 0
     
     figure = plt.figure(figsize=(NCOLS * COL_WIDTH + WIDTH_SPACING, NROWS * ROW_HEIGHT + HEIGHT_SPACING))
-    plt.subplots_adjust(top=0.925, hspace=0.2, wspace=0.25)
+    plt.subplots_adjust(top=0.9, hspace=0.25, wspace=0.3)
     
     if font_dict is None:
         font_dict = {}
+        
+    if title_font_dict is None:
+        title_font_dict = font_dict.copy()
     
     figure.suptitle(title, fontsize=font_dict['fontsize'] * 1.5)
 
@@ -208,35 +223,48 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         tasks_trained_colormap = plt.get_cmap(tasks_trained_colormap)
         
     for dimension_index, dimension_name in enumerate(CONDITION_ANALYSES_FIELDS):
-        num_times_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 1)
+        num_times_trained_ax = plt.subplot(NROWS, NCOLS, dimension_index + 1)# NCOLS * dimension_index + 1)
             
         results = result_set[dimension_index][data_index]
 
-        title = ''
+        title = dimension_name.capitalize() # None  # sets the default title for this plot
+
+        x_label = None
+        y_label = ''
         if dimension_index == 0:
-            title = None  # sets the default title for this plot
-
-        x_label = ''
-        if dimension_index == NROWS - 1:
-            x_label = None  # sets the default x-label for this plot
-
-        y_label = plot_y_label
+            y_label = plot_y_label
         
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     title=title, log_y_custom_ticks=log_y_custom_ticks)
+                                     title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict)
 
-        num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS * dimension_index + 2)
-        y_label = dimension_name.capitalize()
+        num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS + dimension_index + 1) # NCOLS * dimension_index + 2)
+        # y_label = dimension_name.capitalize()
+        title = ''
         
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True, 
-                                      title=title, log_y_custom_ticks=log_y_custom_ticks)
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label,
+                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict)
+        
+        if dimension_index == COMBINED_INDEX:
+            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[0][data_index].mean.shape[0])
+            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[0][data_index].mean.shape[0])
+
         
     plt.show()
 
+    
+def add_colorbar_to_axes(ax, colors, vmin=1, vmax=10):
+    ax_divider = make_axes_locatable(ax)
+    # add an axes to the right of the main axes.
+    cax = ax_divider.append_axes("right", size="8%", pad="4%")
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    cb = matplotlib.colorbar.ColorbarBase(cax, cmap=colors, norm=norm, ticks=np.arange(vmin, vmax + 1))
+    #mappable_colors = matplotlib.cm.ScalarMappable(matplotlib.colors.Normalize(min_val, max_val), cmap=colors)
+    # cb = colorbar(mappable_colors, cax=cax)
+    
     
 PER_MODEL_NROWS = 5
 PER_MODEL_NCOLS = 4
@@ -248,14 +276,24 @@ PER_MODEL_ROW_HEIGHT = 6
 def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, super_title,
                                  font_dict=None, colormap=DEFAULT_COLORMAP, 
                                  ylim=None, log_x=True, log_y=True, shade_error=True, 
-                                 sem_n=1, baseline_sem_n=1, data_index=None, plot_y_label=DEFAULT_Y_LABEL):
+                                 sem_n=1, baseline_sem_n=1, data_index=None, plot_y_label=DEFAULT_Y_LABEL,
+                                 title_font_dict=None):
     
-    plt.figure(figsize=(PER_MODEL_NCOLS * (PER_MODEL_COL_WIDTH + 1), 
-                        PER_MODEL_NROWS * PER_MODEL_ROW_HEIGHT))
-    plt.subplots_adjust(top=0.94, hspace=0.25, wspace=0.25)
+    fig, model_axes = plt.subplots(figsize=(PER_MODEL_NCOLS * (PER_MODEL_COL_WIDTH + 1), 
+                                            PER_MODEL_NROWS * PER_MODEL_ROW_HEIGHT), 
+                                   nrows=PER_MODEL_NROWS, ncols=1, sharey=True)
+    
+    for model_ax in model_axes:
+        model_ax.tick_params(labelcolor=(1.,1.,1., 0.0), top=False, bottom=False, left=False, right=False)
+        model_ax._frameon = False
+    
+    plt.subplots_adjust(top=0.94, hspace=0.35, wspace=0.25)
     
     if font_dict is None:
         font_dict = {}
+        
+    if title_font_dict is None:
+        title_font_dict = font_dict.copy()
 
     if not hasattr(sem_n, '__len__'):
         sem_n = [sem_n] * len(CONDITION_ANALYSES_FIELDS)
@@ -269,32 +307,43 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
     colors = plt.get_cmap(colormap)
     plt.suptitle(super_title, fontsize=font_dict['fontsize'] * 1.5)
     
+    ax_title_font_dict = font_dict.copy()
+    ax_title_font_dict['fontsize'] = ax_title_font_dict['fontsize'] + 4
+    
     # plot the baseline
+    model_axes[0].set_title(f'No query modulation', **ax_title_font_dict)
+    
     for dimension_index, dimension_name in enumerate(CONDITION_ANALYSES_FIELDS):
-        ax = plt.subplot(PER_MODEL_NROWS, PER_MODEL_NCOLS, dimension_index + 1)
+        ax = fig.add_subplot(PER_MODEL_NROWS, PER_MODEL_NCOLS, dimension_index + 1)
             
         results = baseline[dimension_index][data_index]
 
         title = dimension_name.capitalize()
 
-        x_label = ''
+        x_label = None
 
         y_label = ''
         y_label_right = False
         if dimension_index == 0:
             y_label = plot_y_label
-        elif dimension_index == 3:
-            y_label = f'No query\nmodulation'
-            y_label_right = True
+        # elif dimension_index == 3:
+        #     y_label = f'No query\nmodulation'
+        #     y_label_right = True
 
         plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
                   sem_n=baseline_sem_n[dimension_index], font_dict=font_dict, 
-                  x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title)
+                  x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title,
+                  title_font_dict=title_font_dict)
+        
+        if dimension_index == COMBINED_INDEX:
+            add_colorbar_to_axes(ax, colors, vmax=baseline[0][data_index].mean.shape[0])
     
     # plot per query
     for replication_level, replication_analyses in per_query_replication.items():
+        model_axes[replication_level].set_title(f'Query modulation at conv-{replication_level}', **ax_title_font_dict)
+        
         for dimension_index, dimension_name in enumerate(CONDITION_ANALYSES_FIELDS):
-            ax = plt.subplot(PER_MODEL_NROWS, PER_MODEL_NCOLS, 
+            ax = fig.add_subplot(PER_MODEL_NROWS, PER_MODEL_NCOLS, 
                              replication_level * PER_MODEL_NCOLS + dimension_index + 1)
             
             results = replication_analyses[dimension_index][data_index]
@@ -303,21 +352,25 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
 #             if replication_level == 1:
 #                 title = dimension_name.capitalize()
                 
-            x_label = ''
-            if replication_level + 1 == PER_MODEL_NROWS:
-                x_label = None
+            # x_label = ''
+            # if replication_level + 1 == PER_MODEL_NROWS:
+            x_label = None
                 
             y_label = ''
             y_label_right = False
             if dimension_index == 0:
                 y_label = plot_y_label
-            elif dimension_index == 3:
-                y_label = f'Query modulation\nat conv-{replication_level}'
-                y_label_right = True
+            # elif dimension_index == 3:
+            #     y_label = f'Query modulation\nat conv-{replication_level}'
+            #     y_label_right = True
     
             plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
                       sem_n=sem_n[dimension_index], font_dict=font_dict, 
-                      x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title)
+                      x_label=x_label, y_label=y_label, y_label_right=y_label_right, title=title,
+                      title_font_dict=title_font_dict)
+        
+            if dimension_index == COMBINED_INDEX:
+                add_colorbar_to_axes(ax, colors, vmax=baseline[0][data_index].mean.shape[0])
         
     plt.show()
     
@@ -448,8 +501,8 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
     if comparison_mod_level < 0 or comparison_mod_level > 4:
         raise ValueError('Comparison model level should be between 0 and 4 inclusive')
         
-    COMPARISON_NROWS = (PER_MODEL_NROWS - 1)
-    COMPARISON_NCOLS = 2
+    COMPARISON_NROWS = 2 #(PER_MODEL_NROWS - 1)
+    COMPARISON_NCOLS = (PER_MODEL_NROWS - 1) # 2
     COL_WIDTH = 5
     ROW_HEIGHT = 5 
     WIDTH_SPACING = 1
@@ -457,7 +510,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
     
     figure = plt.figure(figsize=(COMPARISON_NCOLS * COL_WIDTH + WIDTH_SPACING, 
                                  COMPARISON_NROWS * ROW_HEIGHT + HEIGHT_SPACING))
-    plt.subplots_adjust(top=0.925 - 0.02 * super_title.count('\n'), hspace=0.25, wspace=0.2)
+    plt.subplots_adjust(top=0.9 - 0.02 * super_title.count('\n'), hspace=0.275, wspace=0.2)
     
     if font_dict is None:
         font_dict = {}
@@ -513,7 +566,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style)
 
-        num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 2)
+        num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, COMPARISON_NCOLS + 1)
         y_label = f'No query\nmodulation'
 
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
@@ -530,8 +583,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         if replication_level > comparison_mod_level:
             replication_level_for_axes -= 1
 
-        num_times_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 
-                                           replication_level_for_axes * COMPARISON_NCOLS + 1)
+        num_times_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, replication_level_for_axes + 1)
 
         if comparison_first:
             results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
@@ -544,29 +596,36 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         results_std = comparison_set[dimension_index][data_index].std
         results = ResultSet(name='diff', mean=results_mean, std=results_std)
 
-        title = ''
-        if replication_level == 1 and comparison_mod_level == 0:
-            title = None  # use the default title
+        title = f'Conv-{replication_level} query modulation'
+        # if replication_level == 1 and comparison_mod_level == 0:
+        #    title = None  # use the default title
 
-        x_label = ''
-        if replication_level_for_axes + 1 == COMPARISON_NROWS:
-            x_label = None  # use the default x-label
+        x_label = None
+        # if replication_level_for_axes + 1 == COMPARISON_NROWS:
+        #     x_label = None  # use the default x-label
 
-        y_label = plot_y_label
+        y_label = '' 
+        if replication_level_for_axes == 0:
+            y_label = plot_y_label
 
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style)
 
-        num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 
-                                           replication_level_for_axes * COMPARISON_NCOLS + 2)
-        y_label = f'Query modulation\nat conv-{replication_level}'
+        num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, COMPARISON_NCOLS + replication_level_for_axes + 1)
+
+        title = ''
+        # y_label = f'Query modulation\nat conv-{replication_level}'
 
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
+                                      font_dict=font_dict, x_label=x_label, y_label=y_label,
                                       title=title, hline_y=null_hline_y, hline_style=null_hline_style)
+        
+        if replication_level_for_axes == 3:
+            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=baseline[0][data_index].mean.shape[0])
+            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=baseline[0][data_index].mean.shape[0])
         
     plt.show()
     

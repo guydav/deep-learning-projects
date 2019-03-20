@@ -44,10 +44,12 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
                             color=colors(row / num_points), alpha=0.25)        
             
     if hline_y is not None:
-        if hline_style is None:
-            hline_style = {}
+        hline = DEFAULT_COMPARISON_HLINE_STYLE.copy()
         
-        ax.axhline(hline_y, **hline_style)
+        if hline_style is not None:
+            hline.update(hline_style)
+        
+        ax.axhline(hline_y, **hline)
         
     if ylim is not None:
         ax.set_ylim(ylim)

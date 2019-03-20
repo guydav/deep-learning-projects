@@ -39,7 +39,9 @@ COMBINED_INDEX = 3
 DIMENSION_NAMES = [COLOR, SHAPE, TEXTURE]
 
 RESULT_SET_FIELDS = ['name', 'mean', 'std']
-ANALYSIS_SET_FIELDS = ['examples', 'log_examples', 'accuracies', 'accuracy_drops', 'examples_by_task']
+ANALYSIS_SET_FIELDS = ['examples', 'log_examples', 'accuracies', 'accuracy_drops',
+                       'first_task_accuracies', 'new_task_accuracies', 'accuracy_counts',
+                       'examples_by_task']
 CONDITION_ANALYSES_FIELDS = DIMENSION_NAMES + [COMBINED]
 
 ResultSet = namedtuple('ResultSet', RESULT_SET_FIELDS)
@@ -52,7 +54,8 @@ for NamedTupleClass in NAMED_TUPLE_CLASSES:
 
 
 RESULT_SET_NAMES = ('Examples to criterion', 'Log examples to criterion', 
-                    'New task accuracy', 'New task accuracy delta')
+                    'New task accuracy', 'New task accuracy delta', 
+                    'First task accuracy by epoch', 'New task accuracy by epoch')
 ANALYSIS_FIELDS_TO_NAMES = {field: name for (name, field) in 
                             zip(ANALYSIS_SET_FIELDS, RESULT_SET_NAMES)}
 ANALYSIS_NAMES_TO_FIELDS = {name: field for (name, field) in 
@@ -109,10 +112,18 @@ def parse_run_results(current_run_id=None, current_run=None, samples=1000):
     accuracy_drop = np.empty((9, 9))
     accuracy_drop.fill(np.nan)
     
+    first_task_accuracy_by_epoch = np.empty((10, samples))
+    first_task_accuracy_by_epoch.fill(np.nan)
+    new_task_accuracy_by_epoch = np.empty((10, samples))
+    new_task_accuracy_by_epoch.fill(np.nan)
+    
     first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - 1
     examples_to_criterion[0, 0] = first_task_finished * examples_per_epoch(1, 1)
     absolute_accuracy[0, 0] = current_df['Test Accuracy, Query #1'][first_task_finished + 1]
     accuracy_drop[0, 0] = current_df['Test Accuracy, Query #1'][first_task_finished] - absolute_accuracy[0, 0]
+    
+    first_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]
+    new_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]
 
     for current_task in range(2, 11):
         current_task_start = current_df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
@@ -137,8 +148,12 @@ def parse_run_results(current_run_id=None, current_run=None, samples=1000):
                 accuracy_drop[number_times_learned - 1, number_total_tasks - 1] = \
                     current_df[f'Test Accuracy, Query #{task}'][current_task_end - 1] - \
                     absolute_accuracy[number_times_learned - 1, number_total_tasks - 1]
+                
+        first_task_accuracy_by_epoch[current_task - 1, 0:current_task_end - current_task_start] = current_df['Test Accuracy, Query #1'][current_task_start:current_task_end]
+        new_task_accuracy_by_epoch[current_task - 1, 0:current_task_end - current_task_start] = current_df[f'Test Accuracy, Query #{current_task}'][current_task_start:current_task_end]
+        
             
-    return examples_to_criterion, absolute_accuracy, accuracy_drop
+    return examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_accuracy_by_epoch, new_task_accuracy_by_epoch
 
 
 PRINT_HEADERS = ['###'] + [str(x) for x in range(1, 11)]
@@ -151,19 +166,25 @@ def pretty_print_results(results, **kwargs):
     print(tabulate.tabulate(result_rows, PRINT_HEADERS, **tab_args))
 
 
-def runs_by_dimension(max_rep_id):
-    runs = API.runs('meta-learning-scaling/sequential-benchmark-baseline')
+DEFAULT_PROJECT_PATH = 'meta-learning-scaling/sequential-benchmark-baseline'
+    
+    
+def load_runs(max_rep_id, project_path=DEFAULT_PROJECT_PATH, split_runs_by_dimension=True):
+    runs = API.runs(project_path)
     
     results = ConditionAnalysesSet([], [], [], [])
     
     for run in runs:
-        run_id = int(run.description.split('\n')[0][-4:])
+        run_name = run.description.split('\n')[0]
+        run_id = int(run_name[run_name.rfind('-') + 1:])
         dimension = (run_id // 1000) - 1
         rep = run_id % 1000
         if rep < max_rep_id:
-            results[dimension].append(run)
             # combined / all runs
-            results[3].append(run)
+            results[COMBINED_INDEX].append(run)
+            # by-dimension
+            if split_runs_by_dimension:
+                    results[dimension].append(run)
             
     return results
 
@@ -190,33 +211,61 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=1000):
     log_examples = []
     abs_accuracies = []
     accuracy_drops = []
+    first_task_accuracies = []
+    new_task_accuracies = []
     
     examples_by_task = np.zeros((30, 10))
     counts_by_task = np.zeros((30, 10))
     
-    for run in runs:
-        print(run.name)
+    for i, run in enumerate(runs):
+        if i > 0 and i % 10 == 0:
+            print(run.name, i)
+        else:
+            print(run.name)
+        
         if ignore_runs is not None and run.name in ignore_runs:
             continue
         
-        examples_to_criterion, absolute_accuracy, accuracy_drop = parse_run_results(current_run=run, samples=samples)
+        examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_acc, new_task_acc = parse_run_results(current_run=run, samples=samples)
         examples.append(examples_to_criterion)
         log_examples.append(np.log(examples_to_criterion))
         abs_accuracies.append(absolute_accuracy)
         accuracy_drops.append(accuracy_drop)
+        first_task_accuracies.append(first_task_acc)
+        new_task_accuracies.append(new_task_acc)
         
         for index, task in enumerate(run.config['query_order']):
             task_examples = np.diag(examples_to_criterion, index)
             examples_by_task[task,:10 - index] += task_examples
             counts_by_task[task,:10 - index] += 1
+            
+    # Removing all extraneous nans
+    print('Removing extraneous nans')
+    first_task_accuracies = np.array(first_task_accuracies)
+    new_task_accuracies = np.array(new_task_accuracies)
+    
+    max_first_nan_idx = np.max(np.argmax(np.isnan(first_task_accuracies), axis=2))
+    print('Max first nan index:', max_first_nan_idx)
+    
+    first_task_accuracies = first_task_accuracies[:, :, :max_first_nan_idx]
+    new_task_accuracies = new_task_accuracies[:, :, :max_first_nan_idx]
+    accuracy_counts = np.count_nonzero(~np.isnan(new_task_accuracies), axis=0)
 
     output = {}
-    for result_set, name, field in zip((examples, log_examples, abs_accuracies, accuracy_drops), 
-                                RESULT_SET_NAMES, ANALYSIS_SET_FIELDS):
+    for result_set, name, field in zip((examples, log_examples, abs_accuracies, accuracy_drops, 
+                                        first_task_accuracies, new_task_accuracies), 
+                                       RESULT_SET_NAMES, 
+                                       ANALYSIS_SET_FIELDS):
+        print(name, field)
         output[field] = ResultSet(name=name, 
-                                  mean=np.mean(result_set, axis=0), 
-                                  std=np.std(result_set, axis=0))
+                                  mean=np.nanmean(result_set, axis=0), 
+                                  std=np.nanstd(result_set, axis=0))
 
+        
+    # eliminate zeros to allow dividing later
+    accuracy_counts[accuracy_counts == 0] = 1
+    output['accuracy_counts'] = accuracy_counts
+        
     # to avoid division by zero
     counts_by_task[counts_by_task == 0] = 1
     average_examples_by_task = np.divide(examples_by_task, counts_by_task)

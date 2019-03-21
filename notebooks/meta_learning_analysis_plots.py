@@ -11,7 +11,19 @@ import numpy as np
 from meta_learning_data_analysis import *
 
 
+SAVE_PATH_PREFIX = 'meta_learning/figures'
 DEFAULT_COLORMAP = 'tab10'
+
+
+def save(save_path):
+    if save_path is not None:
+        if not save_path.startswith(SAVE_PATH_PREFIX):
+            save_path = os.path.join(SAVE_PATH_PREFIX, save_path)
+        
+        folder, filename = os.path.split(save_path)
+        os.makedirs(folder, exist_ok=True)
+        plt.savefig(save_path)
+
 
 
 def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples, 
@@ -79,7 +91,7 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
 def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, dimension_index=COMBINED_INDEX,
                             shade_error=False, font_dict=None, hline_y=None, hline_style=None,
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
-                            title_font_dict=None, add_colorbars=True):
+                            title_font_dict=None, add_colorbars=True, save_path=None):
     NROWS = 2
     NCOLS = 1
     COL_WIDTH = 6
@@ -137,6 +149,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
         add_colorbar_to_axes(new_task_ax, new_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
                              y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
 
+    save(save_path)
     plt.show()
 
 
@@ -318,7 +331,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
                                           log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
                                           dimension_names=CONDITION_ANALYSES_FIELDS, 
-                                          dimension_indices=range(len(CONDITION_ANALYSES_FIELDS))):
+                                          dimension_indices=range(len(CONDITION_ANALYSES_FIELDS)),
+                                          save_path=None):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6
@@ -383,7 +397,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
             add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[3][data_index].mean.shape[0],
                                  y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
 
-        
+    save(save_path)
     plt.show()
 
     
@@ -416,7 +430,7 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
                                  font_dict=None, colormap=DEFAULT_COLORMAP, 
                                  ylim=None, log_x=True, log_y=True, shade_error=True, 
                                  sem_n=1, baseline_sem_n=1, data_index=None, plot_y_label=DEFAULT_Y_LABEL,
-                                 title_font_dict=None, colorbar_y_label=None):
+                                 title_font_dict=None, colorbar_y_label=None, save_path=None):
     
     fig, model_axes = plt.subplots(figsize=(PER_MODEL_NCOLS * (PER_MODEL_COL_WIDTH + 1), 
                                             PER_MODEL_NROWS * PER_MODEL_ROW_HEIGHT), 
@@ -511,6 +525,7 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
             if dimension_index == COMBINED_INDEX:
                 add_colorbar_to_axes(ax, colors, vmax=baseline[0][data_index].mean.shape[0], y_label=colorbar_y_label, y_label_font_dict=font_dict)
         
+    save(save_path)
     plt.show()
     
     
@@ -518,7 +533,7 @@ def comparison_plot_per_model(baseline, per_query_replication, plot_func, super_
                               comparison_mod_level, conditions=None, comparison_func=np.subtract,
                               font_dict=None, colormap=DEFAULT_COLORMAP, comparison_first=False,
                               ylim=None, data_index=None, log_x=True, log_y=True, shade_error=True, 
-                              sem_n=1, baseline_sem_n=1):
+                              sem_n=1, baseline_sem_n=1, save_path=None):
     
     if comparison_mod_level < 0 or comparison_mod_level > 4:
         raise ValueError('Comparison model level should be between 0 and 4 inclusive')
@@ -624,6 +639,7 @@ def comparison_plot_per_model(baseline, per_query_replication, plot_func, super_
             plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
                       sem_n=sem_n[dimension_index], font_dict=font_dict, x_label=x_label, y_label=y_label, title=title)
         
+    save(save_path)
     plt.show()
     
     
@@ -635,7 +651,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                               font_dict=None, comparison_first=False, ylim=None, data_index=None, 
                               log_x=True, log_y=True, shade_error=True, sem_n=1, baseline_sem_n=1, 
                               times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
-                              null_hline_y=None, null_hline_style=None, plot_y_label=''):
+                              null_hline_y=None, null_hline_style=None, plot_y_label='', save_path=None):
     
     if comparison_mod_level < 0 or comparison_mod_level > 4:
         raise ValueError('Comparison model level should be between 0 and 4 inclusive')
@@ -768,6 +784,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                                  y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
             add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
                                  y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
-        
+    
+    save(save_path)
     plt.show()
     

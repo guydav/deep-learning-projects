@@ -1,9 +1,34 @@
 from .base_model import *
 
 
-def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold, threshold_all_queries=False,
-                         num_epochs=100, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
+DEFAULT_ACCURACY_THRESHOLD = 0.95
+
+
+def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold=DEFAULT_ACCURACY_THRESHOLD,
+                         threshold_all_queries=True,
+                         num_epochs=1000, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
                          watch=True, debug=False, save_name='model'):
+    """
+    Execute the sequential benchmark as described in the paper.
+    :param model: Which model to train and test according to the benchmark
+    :param train_dataloader: The dataloader to use for the training set; should be using a dataset form the appropriate
+        (SequentialBenchmarkMetaLearningDataset) class
+    :param test_dataloader: The dataloader to use for the test set; should be using a dataset form the appropriate
+        (SequentialBenchmarkMetaLearningDataset) class
+    :param accuracy_threshold: What accuracy criterion to use; defaults to 95%
+    :param threshold_all_queries: Should the benchmark proceed only when all queries pass the 95% accuracy criterion;
+        defaults to true
+    :param num_epochs: How many epochs to stop after; previously defaulted to 100, currently defaults to 1000
+    :param epochs_to_graph: How many epochs to locally graph results using matplotlib; defualt None => never
+    :param cuda: Whether or not to use CUDA (GPU acceleration)
+    :param save: Whether or not to save the model
+    :param start_epoch: Which epoch we're starting from; useful for restarting failed runs from the middle
+    :param watch: Whether or not to watch the model
+    :param debug: Whether or not to print debug prints
+    :param save_name: A save name for saving results to weights & biases
+    :return:
+    """
+
     if epochs_to_graph is None:
         epochs_to_graph = 10
 

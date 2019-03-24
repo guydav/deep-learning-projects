@@ -27,9 +27,30 @@ DEFAULT_MLP_LAYER_SIZES = (256, 64, 16, 4)
 
 
 class BasicModel(nn.Module):
+    """
+    A base neural network module implementing widely useful behavior, such selecting
+    the right loss function, running training and testing and computing the requisite
+    metrics, and so on. This model does not actually specify the structure of the neural
+    networks examined; subclasses implement that behavior.
+    """
     def __init__(self, name, should_super_init=True, use_mse=False,
                  save_dir=DEFAULT_SAVE_DIR, mse_threshold=0.5, num_classes=2,
                  loss=None, use_query=True, compute_correct_rank=False):
+        """
+        Initialize the model.
+        :param name: What name should the model save checkpoints under.
+        :param should_super_init: Whether or not the model shot initialize the super class;
+            useful in cases of multiple inheritance.
+        :param use_mse: Whether or not the use the mean squared error (MSE) loss function.
+        :param save_dir: Which directory to save to; defaults to `DEFAULT_SAVE_DIR`
+        :param mse_threshold: if using MSE, what threshold to use
+        :param num_classes: how many classes (and output units) to have - default two
+        :param loss: which loss function to use (otherwise defaulting by use_mse or not)
+        :param use_query: Whether or not this model uses a query - defaults to true
+            (this flag was added in order to use this model in another project)
+        :param compute_correct_rank: Whether or not to compute the correct rank order of each
+            classification prediction (this flag was added in order to use this model in another project)
+        """
         if should_super_init:
             super(BasicModel, self).__init__()
 
@@ -59,6 +80,15 @@ class BasicModel(nn.Module):
         self.results = defaultdict(list)
 
     def train_(self, input_img, label, query=None):
+        """
+        Run a training batch. Take a set of input images, pass them forward, compute the loss,
+        take a backward step using the optimizer, compute and return a few additional metrics,
+        :param input_img: The batch of inputs to run through the model, shaped
+            [batch_size x channels x width x height]
+        :param label: the correct prediction for this image, used in order to compute the loss
+        :param query: The query, if this model utilizes it
+        :return: A dict of metrics for this batch: accuracy, loss, AUC, and predictions
+        """
         if self.optimizer is None:
             self._create_optimizer()
 
@@ -125,6 +155,15 @@ class BasicModel(nn.Module):
         return results
 
     def test_(self, input_img, label, query=None):
+        """
+        This this mode. Functionally almost entirely the same as the train_ function, but without
+        taking a backward step through the loss and optimizer.
+        :param input_img: The batch of inputs to run through the model, shaped
+            [batch_size x channels x width x height]
+        :param label: the correct prediction for this image, used in order to compute the loss
+        :param query: The query, if this model utilizes it
+        :return: A dict of metrics for this batch: accuracy, loss, AUC, and predictions
+        """
         output = self(input_img, query)
 
         np_labels = label.data.cpu().numpy()
@@ -183,6 +222,13 @@ class BasicModel(nn.Module):
         return results
 
     def save_model(self, epoch=None, save_results=True, **kwargs):
+        """
+        Save the model and all relevant metrics.
+        :param epoch: The epoch to save this under, inferred from the length of the results if None
+        :param save_results: Whether or not to also save the model results, True by default
+        :param kwargs: Additional metrics to save with the results
+        :return: None
+        """
         if epoch is None:
             epoch = len(self.results['train_accuracies'])
 
@@ -198,6 +244,12 @@ class BasicModel(nn.Module):
             pickle.dump(self.results, f)
 
     def load_model(self, epoch=None, load_results=True):
+        """
+        Load the model from a checkpoint.
+        :param epoch: Which epoch to load; if none, inferred from loading the results.
+        :param load_results: Whether or not to load the results. Must be True to pass epoch=None
+        :return: The loaded results.
+        """
         if epoch == 0:
             print('Warning: asked to load model with epoch 0. Ignoring...')
             return
@@ -249,6 +301,16 @@ def now():
 
 def train_epoch(model, dataloader, cuda=True, device=None,
                 num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
+    """
+    Train a model through an entire epoch, aggregating results.
+    :param model: The model being trained
+    :param dataloader: The PyTorch dataloader, iterated through to retrieve epochs
+    :param cuda: Whether or not to use CUDA (GPU acceleration)
+    :param device: If using CUDA, which device to use; if None and cuda=True, using the default
+    :param num_batches_to_print: How often to print results to the console.
+    :return: Aggregated model results (accuracy, loss, auc, etc.) for the entire epoch
+    """
+
     epoch_results = defaultdict(list)
     epoch_results['per_query_results'] = defaultdict(list)
 
@@ -296,6 +358,16 @@ def train_epoch(model, dataloader, cuda=True, device=None,
 
 
 def test(model, dataloader, cuda=True, device=None, training=False):
+    """
+    Test a model through an entire epoch, aggregating results.
+    :param model: The model being trained
+    :param dataloader: The PyTorch dataloader, iterated through to retrieve epochs
+    :param cuda: Whether or not to use CUDA (GPU acceleration)
+    :param device: If using CUDA, which device to use; if None and cuda=True, using the default
+    :param training: Whether or not in training mode. If true, calls the model's post_test function
+        after done testing. Used for learning rate scheduler purposes.
+    :return: Aggregated model results (accuracy, loss, auc, etc.) for the entire epoch
+    """
     test_results = defaultdict(list)
     test_results['per_query_results'] = defaultdict(list)
 
@@ -342,6 +414,17 @@ def test(model, dataloader, cuda=True, device=None, training=False):
 
 
 def mid_train_plot(model, epochs_to_test):
+    """
+    Mid-training plots, used before I uploaded all results to weights and biases. Creates four plots:
+    1. Loss
+    2. Accuracy
+    3. AUC
+    4. Per-query accuracy
+    :param model: The model to plot results from
+    :param epochs_to_test: How often (in epochs) the model was tested, to account for
+        the potentially different number of datapoints between the train and test loops.
+    :return: None; results plotted.
+    """
     num_plots = 4
     plt.figure(figsize=(16, num_plots))
     epoch = len(model.results['train_losses'])
@@ -406,6 +489,21 @@ def train(model, train_dataloader, test_dataloader, num_epochs=100,
           epochs_to_test=5, epochs_to_graph=None, cuda=True,
           num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT, save=True,
           start_epoch=0, watch=True):
+    """
+    Train a model for a specified number of epochs, testing and saving as often as requested.
+    :param model: The model to train
+    :param train_dataloader: The datalaoder emitting training-set batches.
+    :param test_dataloader: The dataloader emitting test-set batches.
+    :param num_epochs: How many epochs to train the model for; default 100 which is entirely arbitrary
+    :param epochs_to_test: Once in how many epochs to test the mode; default 5
+    :param epochs_to_graph: Once in how many epochs to graph the mode; default None which means never
+    :param cuda: Whether or not to use CUDA (GPU acceleration)
+    :param num_batches_to_print: Once in how many batches during training to print a status
+    :param save: Should this model be saved after every training epoch? default true
+    :param start_epoch: Which epoch training is starting from; used to resmue training.
+    :param watch: Whether or not to watch this model using the Weights & Biases API
+    :return: None
+    """
 
     if epochs_to_graph is None:
         epochs_to_graph = epochs_to_test

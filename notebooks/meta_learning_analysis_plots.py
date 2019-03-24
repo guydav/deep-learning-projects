@@ -13,23 +13,48 @@ from meta_learning_data_analysis import *
 
 SAVE_PATH_PREFIX = 'meta_learning/figures'
 DEFAULT_COLORMAP = 'tab10'
-
+FIGURE_TEMPLATE = r'''\begin{{figure}}[!htb]
+% \vspace{{-0.225in}}
+\centering
+\includegraphics[width=\linewidth]{{ch-results/figures/{save_path}}}
+\caption{{ {{\bf FIGURE TITLE.}} FIGURE DESCRIPTION.}}
+\label{{fig:results-{label_name}}}
+% \vspace{{-0.2in}}
+\end{{figure}}
+'''
+WRAPFIGURE_TEMPLATE = r'''\begin{{wrapfigure}}{{r}}{{0.5\linewidth}}
+\vspace{{-.3in}}
+\begin{{spacing}}{{1.0}}
+\centering
+\includegraphics[width=0.95\linewidth]{{ch-results/figures/{save_path}}}
+\caption{{ {{\bf FIGURE TITLE.}} FIGURE DESCRIPTION.}}
+\label{{fig:results-{label_name}}}
+\end{{spacing}}
+% \vspace{{-.25in}}
+\end{{wrapfigure}}'''
 
 def save(save_path):
     if save_path is not None:
+        save_path_no_ext = os.path.splitext(save_path)[0]
+        print('Figure:\n')
+        print(FIGURE_TEMPLATE.format(save_path=save_path, label_name=save_path_no_ext.replace('/', '-').replace('_', '-')))
+        print('\n Wrapfigure:\n')
+        print(WRAPFIGURE_TEMPLATE.format(save_path=save_path, label_name=save_path_no_ext.replace('/', '-').replace('_', '-')))
+        print('')
+        
         if not save_path.startswith(SAVE_PATH_PREFIX):
             save_path = os.path.join(SAVE_PATH_PREFIX, save_path)
         
         folder, filename = os.path.split(save_path)
         os.makedirs(folder, exist_ok=True)
-        plt.savefig(save_path)
-
+        plt.savefig(save_path, bbox_inches='tight')
 
 
 def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples, 
                         log_x=False, shade_error=False, sem_n=1, ylim=None,
                         font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                        title=None, hline_y=None, hline_style=None, title_font_dict=None):
+                        title=None, hline_y=None, hline_style=None, title_font_dict=None, 
+                        custom_x_ticks=None):
     if font_dict is None:
         font_dict = {}
         
@@ -68,6 +93,11 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
 
     if log_x:
         ax.set_xscale("log", nonposx='clip')
+
+    if custom_x_ticks is not None:
+        ax.set_xticks(custom_x_ticks)
+        ax.set_xticklabels([f'{x // 1000}k' for x in custom_x_ticks])
+        ax.xaxis.set_tick_params(rotation=45)
     
     # ax.set_xticks(np.arange(num_points) + 1)
     # ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
@@ -98,7 +128,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     ROW_HEIGHT = 5 
     
     figure = plt.figure(figsize=(NCOLS * COL_WIDTH, NROWS * ROW_HEIGHT))
-    plt.subplots_adjust(top=0.9, hspace=0.35)
+    plt.subplots_adjust(top=0.9, hspace=0.5)
     
     if font_dict is None:
         font_dict = {}
@@ -121,17 +151,18 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     x_label = None
     y_label = 'First task accuracy'
     
-    def first_task_epochs_to_training_examples(rep):
-        return examples_per_epoch(1, rep + 1)
+    def first_task_epochs_to_training_examples(row):
+        return examples_per_epoch(1, row + 1)
         
     raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
                         log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict)
+                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
+                        custom_x_ticks=generate_custom_ticks())
 
     new_task_ax = plt.subplot(NROWS, NCOLS, 2) 
     results = result_set[dimension_index].new_task_accuracies
-    title = 'New task first episode accuracy by task order' 
+    title = 'New task accuracy by task order' 
     x_label = None
     y_label = 'New task accuracy'
         
@@ -141,7 +172,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     raw_accuracies_plot(new_task_ax, results, new_task_colormap, new_task_epochs_to_training_examples, 
                         log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict)
+                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
+                        custom_x_ticks=generate_custom_ticks(4000, 10, 2))
         
     if add_colorbars:
         add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
@@ -152,8 +184,12 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     save(save_path)
     plt.show()
 
+    
+def generate_custom_ticks(scale=4000, max_power=8, min_power=0):
+    return np.power(2, np.arange(min_power, max_power)) * scale
+    
 
-DEFAULT_LOG_SCALE_CUSTOM_TICKS = np.power(2, np.arange(8)) * 4000  # previously: (4500, 9000, 22500, 45000, 90000, 225000, 450000)
+DEFAULT_LOG_SCALE_CUSTOM_TICKS = generate_custom_ticks()  # previously: (4500, 9000, 22500, 45000, 90000, 225000, 450000)
 
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
@@ -221,7 +257,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         y_ticks = np.log(real_y_ticks)
         
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
+        ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
     
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Number of times trained{log_x and ")" or ""}'
@@ -302,7 +338,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         y_ticks = np.log(real_y_ticks)
         
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'{y:,}' for y in real_y_ticks])
+        ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
         
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Number of tasks trained{log_x and ")" or ""}'    
@@ -374,7 +410,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
 
         x_label = None
         y_label = ''
-        if dimension_index == 0:
+        if ax_index == 0:
             y_label = plot_y_label
         
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
@@ -440,7 +476,7 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
         model_ax.tick_params(labelcolor=(1.,1.,1., 0.0), top=False, bottom=False, left=False, right=False)
         model_ax._frameon = False
     
-    plt.subplots_adjust(top=0.94, hspace=0.35, wspace=0.25)
+    plt.subplots_adjust(top=0.94, hspace=0.35, wspace=0.2)
     
     if font_dict is None:
         font_dict = {}

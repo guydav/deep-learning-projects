@@ -2,6 +2,10 @@ from .base_model import *
 
 
 class ConvInputModel(nn.Module):
+    """
+    A simple convolutional input model: performs four convolutional layers with the provided filter sizes,
+    all using 3x3 convolutions with stride 2 and padding 1, and ReLU activation functions and batch normalization.
+    """
     def __init__(self, filter_sizes=DEFAULT_CONV_FILTER_SIZES):
         super(ConvInputModel, self).__init__()
 
@@ -32,6 +36,10 @@ class ConvInputModel(nn.Module):
 
 
 class FCOutputModel(nn.Module):
+    """
+    Simple fully-connected module: performs four fully-conencted layers with the given layer sizes,
+    using ReLU activation functions, and either a softmax or log-softmax on the output function
+    """
     def __init__(self, layer_sizes=DEFAULT_MLP_LAYER_SIZES, log_softmax=True):
         super(FCOutputModel, self).__init__()
 
@@ -44,7 +52,6 @@ class FCOutputModel(nn.Module):
     def forward(self, x):
         x = self.fc2(x)
         x = F.relu(x)
-        # x = F.dropout(x)
         x = self.fc3(x)
         x = F.relu(x)
         x = self.fc4(x)
@@ -57,6 +64,10 @@ class FCOutputModel(nn.Module):
 
 
 class CNNMLP(BasicModel):
+    """
+    The basic architecture for this task, using a convolutional neural networks followed by a fully connected one,
+    concatenating the query in between the two modules.
+    """
     def __init__(self, query_length, conv_filter_sizes=DEFAULT_CONV_FILTER_SIZES,
                  mlp_layer_sizes=DEFAULT_MLP_LAYER_SIZES, conv_output_size=7200,
                  lr=1e-4,
@@ -86,6 +97,10 @@ class CNNMLP(BasicModel):
 
 
 class PoolingDropoutConvInputModel(nn.Module):
+    """
+    A more advanced version of the convolutional input model, offering support for spatial convolutions after
+    all layers, and performing 2x2 max-pooling after every convolutional layer group.
+    """
     def __init__(self, filter_sizes=(16, 24, 32, 40),
                  dropout=True, p_dropout=0.2):
         super(PoolingDropoutConvInputModel, self).__init__()
@@ -136,6 +151,9 @@ class PoolingDropoutConvInputModel(nn.Module):
 
 
 class SmallerDropoutFCOutputModel(nn.Module):
+    """
+    A modified version of the fully-connected output model, supporting dropout after each layer.
+    """
     def __init__(self, layer_sizes=(256, 256, 256, 256),
                  dropout=True, p_dropout=0.5, output_func=F.log_softmax, output_size=2):
         super(SmallerDropoutFCOutputModel, self).__init__()
@@ -180,6 +198,11 @@ class SmallerDropoutFCOutputModel(nn.Module):
 
 
 class PoolingDropoutCNNMLP(BasicModel):
+    """
+    A full model combining the more advanced versions of the convolutional input module (with pooling and dropout
+    support) and fully-connected module (with dropout support). Also adding a learning rate scheduler, support for
+    using weight decay, and alternative loss functions.
+    """
     def __init__(self, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),
@@ -187,10 +210,31 @@ class PoolingDropoutCNNMLP(BasicModel):
                  conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
                  use_mse=False, loss=None, compute_correct_rank=False,
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
+        """
+        :param query_length: What length of query to expect; defaults to 30
+        :param conv_filter_sizes: How many filters to use in each convolutional filter group
+        :param conv_dropout: Should spatial dropout be used on the convolutional layers
+        :param conv_p_dropout: If using spatial dropout, what dropout proabability?
+        :param mlp_layer_sizes: What sizes to use for the fully-connected (MLP, multilayer perceptron)
+        :param mlp_dropout: Should dropout be used in the MLP?
+        :param mlp_p_dropout: If using dropout, what dropout probability to use
+        :param use_lr_scheduler: Should a learning rate scheduler to reduce the learning rate on plateau be used?
+        :param lr_scheduler_patience: If using a learning rate scheduler, how long a plateau to move before?
+        :param conv_output_size: What output size (once flattened) should be expected from the CNN?
+        :param lr: Learning rate to use
+        :param weight_decay: Weight decay to use
+        :param num_classes: How many classes to support
+        :param use_mse: Whether or not to use the mean squared error (MSE) loss function
+        :param loss: Which loss function to use, if not the defaul one
+        :param compute_correct_rank: Whether or not to compute the correct rank of every mistaken classification
+        :param name: Which name to save checkpoints under
+        :param save_dir: Which directory to save checkpoints to
+        """
         super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
                                                    use_mse=use_mse, loss=loss,
                                                    use_query=query_length != 0,
                                                    compute_correct_rank=compute_correct_rank)
+
         
         self.query_length = query_length
         self.conv = self._create_conv_module(conv_filter_sizes, conv_dropout, conv_p_dropout)
@@ -253,6 +297,11 @@ class PoolingDropoutCNNMLP(BasicModel):
 
 
 class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
+    """
+    A query-modulating convolutional model. Receives the query as well, passes tit hrough a single
+    fully-connected layer, and adds the output for each filter at the appropriate level before the activation function.
+    Setting mod_level to zero corresponds to no query modulation, aka the baseline model.
+    """
     def __init__(self, mod_level, query_length=30, filter_sizes=(16, 24, 32, 40),
                  dropout=True, p_dropout=0.2):
         super(QueryModulatingPoolingDropoutConvInputModel, self).__init__()
@@ -322,6 +371,9 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
 
 
 class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
+    """
+    A full model using the query-modulating convolutional model; see documentation above.m
+    """
     def __init__(self, mod_level, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),

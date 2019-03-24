@@ -22,8 +22,25 @@ DATASET_CACHE_FILE = 'dataset_cache.pickle'
 
 
 class MetaLearningH5Dataset(Dataset):
+    """
+    The default dataset class for the meta-learning dataset we created.
+    Loads the data from an HDF5 file, computes which effective indices are valid
+    (as the number of total valid indices is [number of images] x [number of queries used],
+    and serves images accordingly (see the __getitem__ method)
+    """
     def __init__(self, in_file, transform=None, start_index=0,
                  end_index=None, query_subset=None, return_indices=True):
+        """
+        Initialize a new dataset.
+        :param in_file: The path to read the dataset from
+        :param transform: Whether or not to apply any transformations to the images before returning them
+        :param start_index: Which image to start reading from; used for test-train splits; default 0
+        :param end_index: Which image to stop reading from; used for test-train splits;
+            default None meaning "end of the file"
+        :param query_subset: Which subset of queries to use, if not using all queries;
+            default None which means "all queries"
+        :param return_indices: Whether or not to return the requested indices along with the image; default True
+        """
         super(MetaLearningH5Dataset, self).__init__()
 
         self.in_file = in_file
@@ -49,6 +66,13 @@ class MetaLearningH5Dataset(Dataset):
         self.return_indices = return_indices
 
     def _compute_indices(self, index):
+        """
+        Compute the image and query index from the requested index. We treat the image index as $index // num_queries$
+        and the query index as $index \mod num_queries$, thus every contiguous set of num_query indices correspond to
+        the same image.
+        :param index: The index to retrieve
+        :return: The real indices of the image and query
+        """
         image_index = self.start_index + (index // self.active_queries_per_image)
         query_index = index % self.active_queries_per_image
         # index from the query to the subset
@@ -56,6 +80,14 @@ class MetaLearningH5Dataset(Dataset):
         return image_index, actual_query_index
 
     def __getitem__(self, index):
+        """
+        Return a transformed image, query, and ground truth answer corresponding to an index.
+        :param index: Which index to return from
+        :return: The input image, transformed if a transformer was set during initialization,
+            The query corresponding to this index,
+            The ground truth answer for this query on this image
+            The input index, if initalized with this option
+        """
         image_index, query_index = self._compute_indices(index)
 
         if self.file is None:
@@ -79,6 +111,11 @@ class MetaLearningH5Dataset(Dataset):
 
 
 class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
+    """
+    Entirely the same as its super class, but computing the corect answer from the image descriptions saved in the
+    dataset, rather than from the hard-coded query answer. This is setup for the compostional benchmark (and other
+    two-feature queries), where we wouldn't want to save the answers for all 300 possible two-item queries.
+    """
     def __init__(self, in_file, transform=None, start_index=0,
                  end_index=None, query_subset=None, return_indices=True,
                  num_dimensions=3, features_per_dimension=(10, 10, 10)):
@@ -125,20 +162,28 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                  num_dimensions=3, features_per_dimension=(10, 10, 10),
                  imbalance_threshold=0.2, num_sampling_attempts=20):
         """
+        Dataset class for the sequential benchmark. Samples coreset images according to the description in the paper.
+        During the first episode, returns 22,500 images for the current task. During every subsequent episodes, returns
+        22,500 images for the current task (or query), and splits the rest evenly between previous tasks as the coreset.
+
         Important API-wise:
         Call start_epoch whenever, well, you're starting a new epoch
-        Call next_query whenever criterion is reached for the current query
-        :param in_file:
-        :param benchmark_dimension:
-        :param random_seed:
-        :param previous_query_coreset_size:
-        :param query_order:
-        :param transform:
-        :param start_index:
-        :param end_index:
-        :param return_indices:
-        :param num_dimensions:
-        :param features_per_dimension:
+        Call next_query whenever criterion is reached for the current query and you're starting a new episode
+        :param in_file: Which HDF5 file to load the dataset from
+        :param benchmark_dimension: Which dimension the benchmark is running on, in the sequential, homogeneous
+            dimension condition; None if it is teh sequential, heterogeneous dimensions condition
+        :param random_seed: Which random seed to use for sampling purposes.
+        :param previous_query_coreset_size: How many images to allocate to the coreset used for previous queries.
+        :param query_order: Which query to introduce at which point in the benchmark
+        :param transform: Whether or not to apply any transformations to the images before returning them
+        :param start_index: Which image to start reading from; used for test-train splits; default 0
+        :param end_index: Which image to stop reading from; used for test-train splits;
+            default None meaning "end of the file"
+        :param query_subset: Which subset of queries to use, if not using all queries;
+            default None which means "all queries"
+        :param return_indices: Whether or not to return the requested indices along with the image; default True
+        :param num_dimensions: how many dimensions exist; default 3
+        :param features_per_dimension: how many features exist in each dimension; default 10 each
         """
         super(SequentialBenchmarkMetaLearningDataset, self).__init__(
             in_file, transform, start_index, end_index, None, return_indices,
@@ -176,6 +221,11 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.start_epoch()
 
     def _cache_images_by_query(self):
+        """
+        Cache which images are positive and which are negative for each query, to allow for balanced coresets.
+        This computation should happen once per dataset, and then be loaded from the cache.
+        :return:
+        """
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         cache_path = os.path.join(__location__, DATASET_CACHE_FILE)
 
@@ -226,11 +276,24 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         return len(self.current_epoch_queries)
 
     def next_query(self):
+        """
+        This does not actualyl do much, other than increment the current_query_index. The reason is that start_epoch
+        reads that variable and will use this new value
+        """
         self.current_query_index += 1
 
     def start_epoch(self, debug=False, depth=0):
         """
-        Sample the images for each coreset query to be used for the current epoch
+        Sample the images for each coreset query to be used for the current epoch. This supports a number of
+        different variations:
+
+        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
+        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
+        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
+
+        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
+        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
+        assign the remaining images to the current task.
         """
         self.current_epoch_queries = []
 
@@ -323,6 +386,25 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
                                normalization_dataset_class=MetaLearningH5DatasetFromDescription):
+    """
+    Helper function to create both the train and test normalized datasets.
+    :param dataset_path: Which HDF5 file to load the dataset from
+    :param batch_size: What batch size to use
+    :param num_workers: How many workers to use in the PyTorch dataloaders
+    :param dataset_train_prop: What proportion of the dataset to assign to train; the remainder goes to test
+    :param pin_memory: Whether or not to pin GPU memory; PyTorch optimizations
+    :param downsample_size: If downsampling, how much to downsample by
+    :param should_flip: Should the training set dataloader introduce flipping data augmentation
+    :param shuffle: Should the dataloaders shuffle the data
+    :param return_indices: Whether or not to return indices with the examples
+    :param dataset_class: Which of the dataset classes to use
+    :param dataset_class_kwargs: Keyword arguments to pass to both train and test dataset
+    :param train_dataset_kwargs: Keyword arguments to pass only to the training dataset
+    :param test_dataset_kwargs: Keyword argmetns to pass only to the test dataset
+    :param normalization_dataset_class: If we need to load the dataset to normalize, if it's not cached - which class
+        to use.
+    :return: The datasets and dataloaders for both train and test.
+    """
 
     full_dataset = normalization_dataset_class(dataset_path,return_indices=return_indices)
     test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
@@ -364,7 +446,6 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         channel_means, channel_stds = cache[cache_key]
 
     else:
-        # TODO: why did I have to_tensor.float()? Add it back in later?
         if downsample_size is not None:
             to_pil = transforms.ToPILImage()
             resize = transforms.Resize(downsample_size)

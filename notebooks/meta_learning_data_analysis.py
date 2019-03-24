@@ -314,8 +314,8 @@ def sign_test(values):
     return row_faster_results, col_faster_results, wilcoxon_statistics, wilcoxon_p_values
 
 
-MODULATION_LEVELS = ['None'] + [str(i) for i in range(1, 5)] 
-SIGN_TEST_PRINT_HEADERS = ['Modulation level'] + [str(i) for i in range(1, 5)] 
+MODULATION_LEVELS = ['\\thead[cl]{None}'] + [f'\\thead[cl]{{ {i} }}' for i in range(1, 5)] 
+SIGN_TEST_PRINT_HEADERS = ['\\thead[cl]{Modulation level}'] + [f'\\thead[cl]{{ {i} }}' for i in range(1, 5)] 
 
 
 def pretty_print_sign_test_results(row_faster_results, col_faster_results, 
@@ -333,11 +333,11 @@ def pretty_print_sign_test_results(row_faster_results, col_faster_results,
             if higher_better:
                 row_val, col_val = col_val, row_val
                 
-            result = max(col_val, row_val)
+            result = col_val # max(col_val, row_val)
             n_binom = col_val + row_val
             p = binom_test(max(col_val, row_val), n_binom)
             
-            print_results[row][col] = f'{result} ({col_val}|{row_val}, n={n_binom}, p={p:.3f}{p < 0.05 and "*" or ""}{p < 0.01 and "*" or ""})'
+            print_results[row][col] = f'\\makecell[cl]{{ {result} $(n={n_binom})$ \\\\ $p={p:.4f}{(p < 0.05 and p > 0.01) and "^{*}" or ""}{p < 0.01 and "^{**}" or ""}$}}'
             
             if wilcoxon_statistics is not None:
                 wilcoxon_results[row][col] = f'\n{wilcoxon_statistics[row, col]:.4f}, {wilcoxon_p_values[row, col]:.4f}'

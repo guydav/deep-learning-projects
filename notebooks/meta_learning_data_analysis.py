@@ -156,6 +156,72 @@ def parse_run_results(current_run_id=None, current_run=None, samples=1000):
     return examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_accuracy_by_epoch, new_task_accuracy_by_epoch
 
 
+def parse_run_results_with_new_task_accuracy_and_equal_size(current_run_id=None, current_run=None, samples=1000):
+    if current_run_id is None and current_run is None:
+        print('Must provide either a current run or its id')
+        return
+    
+    if current_run is None:
+        current_run = API.run(f'meta-learning-scaling/sequential-benchmark-baseline/{current_run_id}')
+        
+    current_df = current_run.history(pandas=True, samples=samples)
+    
+    examples_to_criterion = np.empty((10, 10))
+    examples_to_criterion.fill(np.nan)
+    absolute_accuracy = np.empty((10, 10))
+    absolute_accuracy.fill(np.nan)
+    absolute_accuracy_equal_size = np.empty((10, 10))
+    absolute_accuracy_equal_size.fill(np.nan)
+    
+    first_task_accuracy_by_epoch = np.empty((10, samples))
+    first_task_accuracy_by_epoch.fill(np.nan)
+    new_task_accuracy_by_epoch = np.empty((10, samples))
+    new_task_accuracy_by_epoch.fill(np.nan)
+    
+    first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - 1
+    examples_to_criterion[0, 0] = first_task_finished * examples_per_epoch(1, 1)
+    absolute_accuracy[0, 0] = current_df['Test Accuracy, Query #1'][0]
+    absolute_accuracy_equal_size[0, 0] = current_df['Test Accuracy, Query #1'][0]
+    
+    first_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]
+    new_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]
+
+    for current_task in range(2, 11):
+        current_task_start = current_df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
+
+        if current_task == 10:
+            current_task_end = current_df.shape[0]
+        else:
+            current_task_end = current_df[f'Test Accuracy, Query #{current_task + 1}'].first_valid_index()
+
+        current_task_subset = current_df[TASK_ACC_COLS][current_task_start:current_task_end] > 0.95
+
+        for task in range(1, current_task + 1):
+            number_times_learned = current_task - task + 1
+            number_total_tasks = current_task
+
+            examples_to_criterion[number_times_learned - 1, number_total_tasks - 1] = examples_per_epoch(task, current_task) * \
+                (current_task_subset[f'Test Accuracy, Query #{task}'].idxmax() - current_task_start + 1)
+            
+            absolute_accuracy[number_times_learned - 1, number_total_tasks - 1] = \
+                current_df[f'Test Accuracy, Query #{task}'][current_task_start]
+            
+            if task == current_task:
+                equal_size_epochs = current_task_start
+            else:
+                equal_size_epochs = min(current_task_start + current_task - 1, current_task_end - 1)
+            
+            absolute_accuracy_equal_size[number_times_learned - 1, number_total_tasks - 1] = \
+                current_df[f'Test Accuracy, Query #{task}'][equal_size_epochs]
+
+                
+        first_task_accuracy_by_epoch[current_task - 1, 0:current_task_end - current_task_start] = current_df['Test Accuracy, Query #1'][current_task_start:current_task_end]
+        new_task_accuracy_by_epoch[current_task - 1, 0:current_task_end - current_task_start] = current_df[f'Test Accuracy, Query #{current_task}'][current_task_start:current_task_end]
+        
+            
+    return examples_to_criterion, absolute_accuracy, absolute_accuracy_equal_size, first_task_accuracy_by_epoch, new_task_accuracy_by_epoch
+
+
 PRINT_HEADERS = ['###'] + [str(x) for x in range(1, 11)]
 
 
@@ -206,7 +272,7 @@ def query_modulated_runs_by_dimension(max_rep_id):
     return results
 
 
-def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=1000):
+def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=1000, parse_func=parse_run_results):
     examples = []
     log_examples = []
     abs_accuracies = []
@@ -226,7 +292,7 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=1000):
         if ignore_runs is not None and run.name in ignore_runs:
             continue
         
-        examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_acc, new_task_acc = parse_run_results(current_run=run, samples=samples)
+        examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_acc, new_task_acc = parse_func(current_run=run, samples=samples)
         examples.append(examples_to_criterion)
         log_examples.append(np.log(examples_to_criterion))
         abs_accuracies.append(absolute_accuracy)

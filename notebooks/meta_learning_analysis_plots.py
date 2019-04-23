@@ -279,7 +279,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                  title=None, hline_y=None, hline_style=None, 
+                                  title=None, hline_y=None, hline_style=None, highlight_first_time=None,
                                   log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None):
     if font_dict is None:
         font_dict = {}
@@ -294,13 +294,31 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     for task in range(num_points):
         x_values = np.arange(task + 1, num_points + 1)
         y_means = results.mean[task, task:]
-        # ax.scatter(x_values, y_means, color=colors(task / num_points))
-        ax.plot(x_values, y_means, marker='.', markersize=12, color=colors(task / num_points))
+        y_stds = results.std[task, task:] / (sem_n ** 0.5)
         
+        linestyle = '-'
+        marker = '.'
+        color = colors(task / num_points)
+        
+        if task == 0 and highlight_first_time is not None:    
+            if 'dash' in highlight_first_time:
+                linestyle='--'
+            
+            if 'star' in highlight_first_time:
+                marker='*'
+            
+            if 'color' in highlight_first_time:
+                color = '#C0C0C0'
+                
+            if 'highlight' in highlight_first_time:
+                ax.plot(x_values, y_means - 3 * y_stds, linestyle=':', lw=2, color='red', alpha=1.0)
+                ax.plot(x_values, y_means + 3 * y_stds, linestyle=':', lw=2, color='red', alpha=1.0)
+            
+        ax.plot(x_values, y_means, marker=marker, linestyle=linestyle, markersize=12, color=color)
+
         if shade_error:
-            y_stds = results.std[task, task:] / (sem_n ** 0.5)
             ax.fill_between(x_values, y_means - y_stds, y_means + y_stds,
-                            color=colors(task / num_points), alpha=0.25)
+                            color=color, alpha=0.25)
             
     if hline_y is not None:
         if hline_style is None:
@@ -368,6 +386,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
                                           dimension_names=CONDITION_ANALYSES_FIELDS, 
                                           dimension_indices=range(len(CONDITION_ANALYSES_FIELDS)),
+                                          num_tasks_trained_highlight_first_time=None,
                                           save_path=None):
     NROWS = 2
     NCOLS = len(dimension_names)
@@ -425,6 +444,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                       font_dict=font_dict, x_label=x_label, y_label=y_label,
+                                      highlight_first_time=num_tasks_trained_highlight_first_time,
                                       title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict)
         
         if ax_index == len(dimension_names) - 1:

@@ -120,6 +120,8 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
     
 def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, dimension_index=COMBINED_INDEX,
                             shade_error=False, font_dict=None, hline_y=None, hline_style=None,
+                            first_task_title='First task accuracy by times trained',
+                            new_task_title='New task accuracy by task order',
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
                             title_font_dict=None, add_colorbars=True, save_path=None):
     NROWS = 2
@@ -128,7 +130,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     ROW_HEIGHT = 5 
     
     figure = plt.figure(figsize=(NCOLS * COL_WIDTH, NROWS * ROW_HEIGHT))
-    plt.subplots_adjust(top=0.9, hspace=0.5)
+    plt.subplots_adjust(top=0.9, hspace=0.4 + 0.1 * (len(new_task_title) > 0))
     
     if font_dict is None:
         font_dict = {}
@@ -143,26 +145,10 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
         
     if isinstance(new_task_colormap, str):
         new_task_colormap = plt.get_cmap(new_task_colormap)
-        
 
-    first_task_ax = plt.subplot(NROWS, NCOLS, 1)
-    results = result_set[dimension_index].first_task_accuracies
-    title = 'First task accuracy by times trained' 
-    x_label = None
-    y_label = 'First task accuracy'
-    
-    def first_task_epochs_to_training_examples(row):
-        return examples_per_epoch(1, row + 1)
-        
-    raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
-                        log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
-                        font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
-                        custom_x_ticks=generate_custom_ticks())
-
-    new_task_ax = plt.subplot(NROWS, NCOLS, 2) 
+    new_task_ax = plt.subplot(NROWS, NCOLS, 1) 
     results = result_set[dimension_index].new_task_accuracies
-    title = 'New task accuracy by task order' 
+    title = new_task_title
     x_label = None
     y_label = 'New task accuracy'
         
@@ -174,6 +160,21 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
                         custom_x_ticks=generate_custom_ticks(4000, 10, 2))
+    
+    first_task_ax = plt.subplot(NROWS, NCOLS, 2)
+    results = result_set[dimension_index].first_task_accuracies
+    title = first_task_title
+    x_label = None
+    y_label = 'First task accuracy'
+    
+    def first_task_epochs_to_training_examples(row):
+        return examples_per_epoch(1, row + 1)
+        
+    raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
+                        log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
+                        font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
+                        custom_x_ticks=generate_custom_ticks())
         
     if add_colorbars:
         add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
@@ -376,7 +377,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
 
     
 DEFAULT_Y_LABEL = 'Log(examples to criterion)'
-ORDINAL_POSITION_LABEL = 'Query ordinal position'
+ORDINAL_POSITION_LABEL = 'Task ordinal position'
 NUM_TIMES_TRAINED_LABEL = 'Number of times trained'
     
 

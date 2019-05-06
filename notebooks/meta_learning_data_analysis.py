@@ -180,8 +180,8 @@ def parse_run_results_with_new_task_accuracy_and_equal_size(current_run_id=None,
     
     first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - 1
     examples_to_criterion[0, 0] = first_task_finished * examples_per_epoch(1, 1)
-    absolute_accuracy[0, 0] = current_df['Test Accuracy, Query #1'][0]
-    absolute_accuracy_equal_size[0, 0] = current_df['Test Accuracy, Query #1'][0]
+    absolute_accuracy[0, 0] = current_df['Test Accuracy, Query #1'][1] # index 0 is all NaNs, presumably the initalization
+    absolute_accuracy_equal_size[0, 0] = current_df['Test Accuracy, Query #1'][1]
     
     first_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]
     new_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][1:first_task_finished + 1]

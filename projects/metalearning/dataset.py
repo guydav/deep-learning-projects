@@ -688,7 +688,7 @@ class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescripti
         print([len(s) for s in self.sub_epochs])
 
     def _compute_indices(self, index):
-        print(index, self.current_epoch_queries[index])
+        print(index, len(self.current_epoch_queries))
         return self.current_epoch_queries[index]
 
     def start_epoch(self):

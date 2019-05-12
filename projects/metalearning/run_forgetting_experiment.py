@@ -86,7 +86,10 @@ if __name__ == '__main__':
     run_config = json.loads(wandb_run.json_config)
 
     dataset_random_seed = run_config['dataset_random_seed']['value']
-    benchmark_dimension = run_config['benchmark_dimension']['value']['value']
+    benchmark_dimension = run_config['benchmark_dimension']['value']
+    if not isinstance(benchmark_dimension, int):
+        benchmark_dimension = benchmark_dimension['value']
+        
     query_order = run_config['query_order']['value']
 
     files = wandb_run.files()

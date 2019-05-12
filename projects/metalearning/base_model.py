@@ -267,16 +267,19 @@ class BasicModel(nn.Module):
                 epoch = len(self.results['train_accuracies'])
 
         # adding support for partial states
-        loaded_state = torch.load(self._save_path(epoch))
-        state = self.state_dict()
-        state.update(loaded_state)
-        self.load_state_dict(state)
+        self.load_state(self._save_path(epoch))
 
         return self.results
 
     def load_results(self):
         with open(f'{self._save_dir()}/results.pickle', 'rb') as f:
             self.results.update(pickle.load(f))
+
+    def load_state(self, path):
+        loaded_state = torch.load(path)
+        state = self.state_dict()
+        state.update(loaded_state)
+        self.load_state_dict(state)
 
     def _save_path(self, epoch):
         return f'{self._save_dir()}/epoch_{epoch:02d}.pth'

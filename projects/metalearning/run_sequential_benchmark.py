@@ -109,7 +109,7 @@ if __name__ == '__main__':
             query_order = latin_square[args.latin_square_index % latin_square.shape[0]]
             query_order -= 1
 
-        else:`
+        else:
             query_order = np.arange(10)
             np.random.shuffle(query_order)
 

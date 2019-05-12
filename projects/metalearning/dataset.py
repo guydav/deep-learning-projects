@@ -378,6 +378,328 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         return self.current_epoch_queries[index]
 
 
+class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescription):
+    def __init__(self, in_file, benchmark_dimension, random_seed,
+                 previous_query_coreset_size, query_order, single_dimension=True,
+                 coreset_size_per_query=False, transform=None,
+                 start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.2, num_sampling_attempts=20):
+        """
+        Dataset class for the sequential benchmark. Samples coreset images according to the description in the paper.
+        During the first episode, returns 22,500 images for the current task. During every subsequent episodes, returns
+        22,500 images for the current task (or query), and splits the rest evenly between previous tasks as the coreset.
+
+        Important API-wise:
+        Call start_epoch whenever, well, you're starting a new epoch
+        Call next_query whenever criterion is reached for the current query and you're starting a new episode
+        :param in_file: Which HDF5 file to load the dataset from
+        :param benchmark_dimension: Which dimension the benchmark is running on, in the sequential, homogeneous
+            dimension condition; None if it is teh sequential, heterogeneous dimensions condition
+        :param random_seed: Which random seed to use for sampling purposes.
+        :param previous_query_coreset_size: How many images to allocate to the coreset used for previous queries.
+        :param query_order: Which query to introduce at which point in the benchmark
+        :param transform: Whether or not to apply any transformations to the images before returning them
+        :param start_index: Which image to start reading from; used for test-train splits; default 0
+        :param end_index: Which image to stop reading from; used for test-train splits;
+            default None meaning "end of the file"
+        :param query_subset: Which subset of queries to use, if not using all queries;
+            default None which means "all queries"
+        :param return_indices: Whether or not to return the requested indices along with the image; default True
+        :param num_dimensions: how many dimensions exist; default 3
+        :param features_per_dimension: how many features exist in each dimension; default 10 each
+        """
+        super(SequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file, transform, start_index, end_index, None, return_indices,
+            num_dimensions, features_per_dimension)
+
+        # In the case it's a single-dimension example, validate parameters
+        if single_dimension:
+            if benchmark_dimension >= num_dimensions:
+                raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
+
+            if len(query_order) != features_per_dimension[benchmark_dimension]:
+                raise ValueError(
+                    f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
+
+            dimension_sizes = list(np.cumsum(features_per_dimension))
+            dimension_sizes.insert(0, 0)
+
+            if np.any(np.array(query_order) < dimension_sizes[benchmark_dimension]) or \
+                    np.any(np.array(query_order) >= dimension_sizes[benchmark_dimension + 1]):
+                raise ValueError(
+                    f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
+
+
+        self.previous_query_coreset_size = previous_query_coreset_size
+        self.coreset_size_per_query = coreset_size_per_query
+        self.random_seed = random_seed
+        np.random.seed(random_seed)
+        self.imbalance_threshold = imbalance_threshold
+        self.num_sampling_attempts = num_sampling_attempts
+        self.query_order = query_order
+        self.current_query_index = 0
+        self._cache_images_by_query()
+
+        self.current_epoch_queries = []
+        self.start_epoch()
+
+    def _cache_images_by_query(self):
+        """
+        Cache which images are positive and which are negative for each query, to allow for balanced coresets.
+        This computation should happen once per dataset, and then be loaded from the cache.
+        :return:
+        """
+        __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+        cache_path = os.path.join(__location__, DATASET_CACHE_FILE)
+
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as cache_file:
+                cache = pickle.load(cache_file)
+
+        else:
+            cache = {}
+
+        positive_cache_key = (self.in_file, 'per_query_positive')
+        negative_cache_key = (self.in_file, 'per_query_negative')
+
+        if positive_cache_key in cache and negative_cache_key in cache:
+            print('Loading positive and negative images from cache')
+            self.positive_images = cache[positive_cache_key]
+            self.negative_images = cache[negative_cache_key]
+
+        else:
+            self.positive_images = defaultdict(set)
+            self.negative_images = defaultdict(set)
+
+            with h5py.File(self.in_file, 'r') as file:
+                y = file['y']
+                for i in range(y.shape[0]):
+                    for q in range(y.shape[1]):
+                        if y[i, q] == 1:
+                            self.positive_images[q].add(i)
+                        else:
+                            self.negative_images[q].add(i)
+
+            cache[positive_cache_key] = self.positive_images
+            cache[negative_cache_key] = self.negative_images
+
+            with open(cache_path, 'wb') as cache_file:
+                pickle.dump(cache, cache_file)
+
+    def __len__(self):
+        # if self.coreset_size_per_query:
+        #     return self.current_query_index * self.previous_query_coreset_size + self.num_images
+        #
+        # # After the first task, we work with the entire set
+        # if self.current_query_index > 0:
+        #     return self.num_images
+        #
+        # # For the first task, there's no coreset
+        # return self.num_images - self.previous_query_coreset_size
+        return len(self.current_epoch_queries)
+
+    def next_query(self):
+        """
+        This does not actualyl do much, other than increment the current_query_index. The reason is that start_epoch
+        reads that variable and will use this new value
+        """
+        self.current_query_index += 1
+
+    def start_epoch(self, debug=False, depth=0):
+        """
+        Sample the images for each coreset query to be used for the current epoch. This supports a number of
+        different variations:
+
+        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
+        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
+        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
+
+        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
+        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
+        assign the remaining images to the current task.
+        """
+        self.current_epoch_queries = []
+
+        if debug: debug_print('Starting start_epoch')
+
+        if depth >= self.num_sampling_attempts:
+            raise ValueError('Warning, exceeded maximum number of sampling attempts, this is not great')
+
+        if not self.coreset_size_per_query:
+            image_set = set(range(self.num_images))
+
+            if self.current_query_index > 0:
+                query_coreset_sizes = np.array([int(self.previous_query_coreset_size * i / self.current_query_index)
+                                                for i in range(self.current_query_index + 1)])
+                query_coreset_sizes = query_coreset_sizes[1:] - query_coreset_sizes[:-1]
+
+        for previous_query_index in range(self.current_query_index):
+            previous_query = self.query_order[previous_query_index]
+
+            if debug: debug_print(f'Starting previous query #{previous_query_index} = {previous_query}')
+
+            # This would happen in our test loader:
+            if self.previous_query_coreset_size == self.num_images:
+                self.current_epoch_queries.extend(list(zip(range(self.num_images),
+                                                           itertools.cycle([previous_query]))))
+
+            else:
+                if self.coreset_size_per_query:
+                    positive_size = self.previous_query_coreset_size // 2
+                    negative_size = positive_size
+                    positive_queries = np.random.choice(list(self.positive_images[previous_query]), positive_size, False)
+                    negative_queries = np.random.choice(list(self.negative_images[previous_query]), negative_size, False)
+                    current_task_coreset = np.concatenate((positive_queries, negative_queries))
+
+                else:  # shared coreset among all queries
+                    current_coreset_size = query_coreset_sizes[previous_query_index]
+
+                    smaller_proportion = 0
+                    attempt_count = 0
+
+                    while smaller_proportion < self.imbalance_threshold \
+                            and attempt_count < self.num_sampling_attempts:
+
+                        attempt_count += 1
+                        if debug: debug_print(f'Starting attempt #{attempt_count}')
+                        image_list = list(image_set)
+                        if debug: debug_print(f'Casted coreset to a list')
+                        current_task_coreset = np.random.choice(image_list, current_coreset_size, False)
+                        if debug: debug_print(f'Sampled current task coreset')
+
+                        # negative_count = sum([x in self.negative_images[previous_query]
+                        # for x in current_task_coreset])
+                        positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
+                        smaller_proportion = min(positive_count / current_coreset_size,
+                                                 1 - (positive_count / current_coreset_size))
+                        if debug: debug_print(f'Computed counts and proportions')
+
+                    if attempt_count >= self.num_sampling_attempts:
+                        print(f'Warning, failed to balance query #{previous_query_index + 1}, restarting...')
+                        return self.start_epoch(debug, depth + 1)
+
+                    if debug: debug_print(f'Successfully generated coreset for current task')
+                    image_set = image_set.difference(set(current_task_coreset))
+
+                self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
+
+        if self.coreset_size_per_query:  # use the entire training set for the previous query
+            self.current_epoch_queries.extend(list(zip(range(self.num_images),
+                                                   itertools.cycle([self.query_order[self.current_query_index]]))))
+        else:
+            if self.current_query_index == 0:
+                image_set = set(np.random.choice(self.num_images,
+                                                 self.num_images - self.previous_query_coreset_size,
+                                                 False))
+
+            self.current_epoch_queries.extend(list(zip(image_set,
+                                                       itertools.cycle([self.query_order[self.current_query_index]]))))
+
+        # print(self.current_query_index, len(self), len(self.current_epoch_queries))
+
+    def _compute_indices(self, index):
+        return self.current_epoch_queries[index]
+
+
+class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescription):
+    def __init__(self, in_file, benchmark_dimension, random_seed,
+                 sub_epoch_size, query_order, single_dimension=True,
+                 transform=None,
+                 start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10)):
+        """
+        Dataset class for the sequential benchmark. Samples coreset images according to the description in the paper.
+        During the first episode, returns 22,500 images for the current task. During every subsequent episodes, returns
+        22,500 images for the current task (or query), and splits the rest evenly between previous tasks as the coreset.
+
+        Important API-wise:
+        Call start_epoch whenever, well, you're starting a new epoch
+        Call next_query whenever criterion is reached for the current query and you're starting a new episode
+        :param in_file: Which HDF5 file to load the dataset from
+        :param benchmark_dimension: Which dimension the benchmark is running on, in the sequential, homogeneous
+            dimension condition; None if it is teh sequential, heterogeneous dimensions condition
+        :param random_seed: Which random seed to use for sampling purposes.
+        :param sub_epoch_size: The size of each 'small' epoch to run
+        :param query_order: Which query to introduce at which point in the benchmark
+        :param transform: Whether or not to apply any transformations to the images before returning them
+        :param start_index: Which image to start reading from; used for test-train splits; default 0
+        :param end_index: Which image to stop reading from; used for test-train splits;
+            default None meaning "end of the file"
+        :param query_subset: Which subset of queries to use, if not using all queries;
+            default None which means "all queries"
+        :param return_indices: Whether or not to return the requested indices along with the image; default True
+        :param num_dimensions: how many dimensions exist; default 3
+        :param features_per_dimension: how many features exist in each dimension; default 10 each
+        """
+        super(SequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file, transform, start_index, end_index, None, return_indices,
+            num_dimensions, features_per_dimension)
+
+        # In the case it's a single-dimension example, validate parameters
+        if single_dimension:
+            if benchmark_dimension >= num_dimensions:
+                raise ValueError(f'Benchmark dimension ({benchmark_dimension}) must be smaller than the number of dimensions ({num_dimensions})')
+
+            if len(query_order) != features_per_dimension[benchmark_dimension]:
+                raise ValueError(
+                    f'The length of the query order {query_order} => {len(query_order)} must be equal to the number of features in that dimension ({features_per_dimension[benchmark_dimension]})')
+
+            dimension_sizes = list(np.cumsum(features_per_dimension))
+            dimension_sizes.insert(0, 0)
+
+            if np.any(np.array(query_order) < dimension_sizes[benchmark_dimension]) or \
+                    np.any(np.array(query_order) >= dimension_sizes[benchmark_dimension + 1]):
+                raise ValueError(
+                    f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
+
+        self.random_seed = random_seed
+        np.random.seed(random_seed)
+        self.sub_epoch_size = sub_epoch_size
+        self.num_sub_epochs = self.num_images // self.sub_epoch_size
+        self.sub_epoch_index = -1
+        self.sub_epochs = []
+        self.query_order = query_order
+        self.current_query_index = 1  # we start from one, since we do not actually train on the 1st query
+
+        self.current_epoch_queries = []
+        self.start_epoch()
+
+    def __len__(self):
+        return self.sub_epoch_size
+
+    def next_query(self):
+        """
+        This does not actually do much, other than increment the current_query_index. The reason is that start_epoch
+        reads that variable and will use this new value
+        """
+        self.current_query_index += 1
+        self.sub_epoch_index = -1
+
+    def assign_images_to_sub_epochs(self):
+        perm = np.random.permutation(self.num_images)
+        sub_epochs_without_task = [perm[i * self.sub_epoch_size:(i + 1) * self.sub_epoch_size]
+                                   for i in range(self.num_sub_epochs)]
+
+        self.sub_epochs = [list(zip(sub_epoch,
+                                    itertools.cycle([self.query_order[self.current_query_index]])))
+                           for sub_epoch in sub_epochs_without_task]
+
+    def _compute_indices(self, index):
+        return self.current_epoch_queries[index]
+
+    def start_epoch(self):
+        """
+        Start a new "small" epoch - either resample the dataset into sub-epochs
+        or simply increment to the next one
+        """
+        self.sub_epoch_index += 1
+
+        if self.sub_epoch_index % self.num_sub_epochs == 0:
+            self.assign_images_to_sub_epochs()
+            self.sub_epoch_index = 0
+
+
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
                                dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
@@ -385,7 +707,8 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                shuffle=True, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
-                               normalization_dataset_class=MetaLearningH5DatasetFromDescription):
+                               normalization_dataset_class=MetaLearningH5DatasetFromDescription,
+                               train_dataset_class=None, test_dataset_class=None):
     """
     Helper function to create both the train and test normalized datasets.
     :param dataset_path: Which HDF5 file to load the dataset from
@@ -405,6 +728,11 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
         to use.
     :return: The datasets and dataloaders for both train and test.
     """
+    if train_dataset_class is None:
+        train_dataset_class = dataset_class
+
+    if test_dataset_class is None:
+        test_dataset_class = dataset_class
 
     full_dataset = normalization_dataset_class(dataset_path,return_indices=return_indices)
     test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
@@ -498,16 +826,19 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     train_transformer = transforms.Compose(train_transforms)
     test_transformer = transforms.Compose(test_transforms)
 
-    normalized_train_dataset = dataset_class(dataset_path, transform=train_transformer,
+    normalized_train_dataset = train_dataset_class(dataset_path, transform=train_transformer,
                                              end_index=test_train_split_index,
                                              return_indices=return_indices, **train_dataset_kwargs)
     train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
-    normalized_test_dataset = dataset_class(dataset_path, transform=test_transformer,  # augment only in train
+    normalized_test_dataset = test_dataset_class(dataset_path, transform=test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
                                             return_indices=return_indices, **test_dataset_kwargs)
     test_dataloader = DataLoader(normalized_test_dataset, batch_size=batch_size,
                                  shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
     return normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader
+
+
+

@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     with open(args.run_id_file_path, 'r') as run_id_file:
         run_ids = run_id_file.readlines()
-        run_id = run_ids[args.run_id_line_number]
+        run_id = run_ids[args.run_id_line_number].strip()
 
     print(f'For line {args.run_id_line_number} the id is {run_id}')
 

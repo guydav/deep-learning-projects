@@ -430,7 +430,6 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
                 raise ValueError(
                     f'The query order {query_order} for dimension {benchmark_dimension} must be between {dimension_sizes[benchmark_dimension]} and {dimension_sizes[benchmark_dimension + 1] - 1}')
 
-
         self.previous_query_coreset_size = previous_query_coreset_size
         self.coreset_size_per_query = coreset_size_per_query
         self.random_seed = random_seed
@@ -441,7 +440,6 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.current_query_index = 0
         self._cache_images_by_query()
 
-        self.current_epoch_queries = []
         self.start_epoch()
 
     def _cache_images_by_query(self):
@@ -688,8 +686,7 @@ class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescripti
         print([len(s) for s in self.sub_epochs])
 
     def _compute_indices(self, index):
-        print(index, len(self.current_epoch_queries))
-        return self.current_epoch_queries[index]
+        return self.sub_epochs[self.sub_epoch_index][index]
 
     def start_epoch(self):
         """

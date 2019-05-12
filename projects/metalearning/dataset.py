@@ -632,7 +632,7 @@ class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescripti
         :param num_dimensions: how many dimensions exist; default 3
         :param features_per_dimension: how many features exist in each dimension; default 10 each
         """
-        super(SequentialBenchmarkMetaLearningDataset, self).__init__(
+        super(ForgettingExperimentMetaLearningDataset, self).__init__(
             in_file, transform, start_index, end_index, None, return_indices,
             num_dimensions, features_per_dimension)
 

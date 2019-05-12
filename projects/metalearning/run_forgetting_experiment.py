@@ -54,7 +54,6 @@ DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
 DEFAULT_MAX_EPOCHS = 1000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
-parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 DEFAULT_WANDB_PROJECT = 'sequential-benchmark-forgetting-experiment'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
@@ -110,7 +109,6 @@ if __name__ == '__main__':
     save_dir = args.save_dir
     current_epoch = 0
     total_epochs = args.max_epochs
-    threshold_all_queries = bool(args.threshold_all_queries)
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,
@@ -160,7 +158,7 @@ if __name__ == '__main__':
     if len(description) > 0:
         description += '\n'
 
-    description += f'{args.name}-{dataset_random_seed}\ncoreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
+    description += f'{args.name}-{dataset_random_seed}\nsub-epoch size: {train_sub_epoch_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}'
     wandb.run.description = description
     wandb.run.save()
 
@@ -182,7 +180,6 @@ if __name__ == '__main__':
 
     forgetting_experiment(sequential_benchmark_test_model, checkpoint_file_pattern,
                           train_dataloader, test_dataloader, accuracy_threshold,
-                         threshold_all_queries=threshold_all_queries,
                          num_epochs=total_epochs - current_epoch,
                          epochs_to_graph=total_epochs + 1,
                          start_epoch=current_epoch,

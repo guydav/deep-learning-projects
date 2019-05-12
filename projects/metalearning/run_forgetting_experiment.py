@@ -93,7 +93,7 @@ if __name__ == '__main__':
     files = wandb_run.files()
     for f in files:
         if f.name.endswith('.pth'):
-            f.download()
+            f.download(replace=True)
 
     checkpoint_file_pattern = args.checkpoint_file_pattern.format(seed=dataset_random_seed)
 

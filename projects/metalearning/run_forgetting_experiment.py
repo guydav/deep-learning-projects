@@ -149,7 +149,6 @@ if __name__ == '__main__':
         name=f'{args.name}-{dataset_random_seed}',
         save_dir=save_dir)
 
-    sequential_benchmark_test_model.load_model(current_epoch)
     sequential_benchmark_test_model = sequential_benchmark_test_model.cuda()
 
     wandb.init(entity='meta-learning-scaling', project=args.wandb_project)

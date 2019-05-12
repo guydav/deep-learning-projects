@@ -21,7 +21,7 @@ export CUDA_VISIBLE_DEVICES=${gpu_id}
 wandb login 9676e3cc95066e4865586082971f2653245f09b4
 
 for i in `seq ${start_index} ${end_index}`; do
-    python run_control_sequential_benchmark.py --name ${run_name} --run_id_line_number ${i} ${@:5}
+    python run_forgetting_experiment.py --name ${run_name} --run_id_line_number ${i} ${@:5}
     sleep 1s;
 done
 

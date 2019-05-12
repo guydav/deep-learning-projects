@@ -56,7 +56,7 @@ DEFAULT_MAX_EPOCHS = 1000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 parser.add_argument('--threshold_all_queries', type=int, default=1)
 
-DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
+DEFAULT_WANDB_PROJECT = 'sequential-benchmark-forgetting-experiment'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 parser.add_argument('--debug', action='store_true')

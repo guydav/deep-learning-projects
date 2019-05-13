@@ -223,6 +223,8 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
 
         criterion_met = log_results['Test Per-Query Accuracy (list)'][current_query_index] > accuracy_threshold
 
+        print(epoch, current_query_index, log_results['Test Per-Query Accuracy (list)'], criterion_met)
+
         if criterion_met:
             print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({query_order[current_query_index]}), moving to the next query')
             train_dataloader.dataset.next_query()

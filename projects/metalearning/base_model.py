@@ -144,7 +144,7 @@ class BasicModel(nn.Module):
             accuracy=accuracy.item(),
             loss=loss.item(),
             auc=auc,
-            pred=pred.item(),
+            pred=pred.data,
             per_query_results=per_query_results
         )
 
@@ -211,7 +211,7 @@ class BasicModel(nn.Module):
             accuracy=accuracy.item(),
             loss=loss.item(),
             auc=auc,
-            pred=pred.item(),
+            pred=pred.data,
             per_query_results=per_query_results
         )
 

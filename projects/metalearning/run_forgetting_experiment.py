@@ -31,7 +31,7 @@ parser.add_argument('--run_path_pattern', type=str, default=RUN_PATTERN)
 CHECKPOINT_FILE_PATTERN = 'Baseline-{seed}-query-{{query}}.pth'
 parser.add_argument('--checkpoint_file_pattern', type=str, default=CHECKPOINT_FILE_PATTERN)
 
-DEFAULT_TRAIN_SUB_EPOCH_SIZE = 4500
+DEFAULT_TRAIN_SUB_EPOCH_SIZE = 1500  # 4500
 parser.add_argument('--train_sub_epoch_size', type=int, default=DEFAULT_TRAIN_SUB_EPOCH_SIZE)
 
 ##### verified up to there
@@ -55,7 +55,7 @@ parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
 DEFAULT_MAX_EPOCHS = 1000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 
-DEFAULT_WANDB_PROJECT = 'sequential-benchmark-forgetting-experiment'
+DEFAULT_WANDB_PROJECT = 'sequential-benchmark-forgetting-experiment-revisited' # 'sequential-benchmark-forgetting-experiment'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 parser.add_argument('--debug', action='store_true')

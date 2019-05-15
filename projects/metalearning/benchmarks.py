@@ -152,6 +152,7 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
     if epochs_to_graph is None:
         epochs_to_graph = 10
 
+    device = None
     if cuda:
         device = next(model.parameters()).device
 
@@ -164,6 +165,12 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
 
     print('Loading checkpoint for end of previous query')
     model.load_state(checkpoint_file_pattern.format(query=0))
+
+    # Test the model to get a baseline for the forgetting curves
+    test_results = test(model, test_dataloader, cuda, device, True)
+    print_status(model, 0, f'PRE-TASK 1', test_results)
+    log_results = create_log_results_dict(0, query_order, total_training_size, test_results)
+    wandb.log(log_results)
 
     test_dataloader.dataset.next_query()  # we need to make sure two queries are active from the first moment
 
@@ -185,43 +192,13 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
 
         total_training_size += len(train_dataloader.dataset)
 
-        log_results = {
-            'Total Train Size': total_training_size,
-            'Train Accuracy': np.mean(train_results['accuracies']),
-            'Train Loss': np.mean(train_results['losses']),
-            'Train AUC': np.mean(train_results['aucs']),
-            'Train Per-Query Accuracy (dict)': {str(index): np.mean(train_results['per_query_results'][query])
-                                                for index, query in enumerate(query_order[:current_query_index + 1])},
-            'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
-                                                         for query in query_order[:current_query_index + 1]]),
-            'Test Accuracy': np.mean(test_results['accuracies']),
-            'Test Loss': np.mean(test_results['losses']),
-            'Test AUC': np.mean(test_results['aucs']),
-            'Test Per-Query Accuracy (dict)': {str(index): np.mean(test_results['per_query_results'][query])
-                                                for index, query in enumerate(query_order[:current_query_index + 1])},
-            'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
-                                                        for query in query_order[:current_query_index + 1]]),
-        }
-
-        log_results.update({f'Train Accuracy, Query #{index + 1}': np.mean(train_results['per_query_results'][query])
-                            for index, query in enumerate(query_order[:current_query_index + 1])})
-
-        log_results.update({f'Test Accuracy, Query #{index + 1}': np.mean(test_results['per_query_results'][query])
-                            for index, query in enumerate(query_order[:current_query_index + 1])})
-
-        if current_query_index > 0:
-            log_results['Train Mean Previous-Query Accuracy'] = np.mean(
-                [np.mean(train_results['per_query_results'][query])
-                 for query in query_order[:current_query_index]])
-
-            log_results['Test Mean Previous-Query Accuracy'] = np.mean(
-                [np.mean(test_results['per_query_results'][query])
-                 for query in query_order[:current_query_index]])
+        log_results = create_log_results_dict(current_query_index, query_order, total_training_size, test_results,
+                                              train_results)
 
         # for k, v in log_results.items():
         #     print(f'{k}: {v}')
 
-        wandb.log(log_results, step=epoch)
+        wandb.log(log_results)
 
         criterion_met = log_results['Test Per-Query Accuracy (list)'][current_query_index] > accuracy_threshold
 
@@ -239,8 +216,54 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
             print('Loading checkpoint for end of previous query')
             model.load_state(checkpoint_file_pattern.format(query=current_query_index))
 
+            # Test the model to get a baseline for the forgetting curves
+            test_results = test(model, test_dataloader, cuda, device, True)
+            print_status(model, epoch, f'PRE-TASK {current_query_index + 1}', test_results)
+            log_results = create_log_results_dict(0, query_order, total_training_size, test_results)
+            wandb.log(log_results)
+
         if epoch % epochs_to_graph == 0:
             mid_train_plot(model, 1)
 
         if train_dataloader.dataset.current_query_index == len(query_order):
             return
+
+
+def create_log_results_dict(current_query_index, query_order, total_training_size, test_results=None,
+                            train_results=None):
+    log_results = {
+        'Total Train Size': total_training_size,
+    }
+
+    if test_results is not None:
+        test_log = epoch_results_to_log_dict(query_order, current_query_index, test_results, 'Test')
+        log_results.update(test_log)
+
+    if train_results is not None:
+        train_log = epoch_results_to_log_dict(query_order, current_query_index, train_results, 'Train')
+        log_results.update(train_log)
+
+    return log_results
+
+
+def epoch_results_to_log_dict(query_order, current_query_index, epoch_results, name):
+    name = name.capitalize()
+    log_dict = {
+        f'{name} Accuracy': np.mean(epoch_results['accuracies']),
+        f'{name} Loss': np.mean(epoch_results['losses']),
+        f'{name} AUC': np.mean(epoch_results['aucs']),
+        f'{name} Per-Query Accuracy (dict)': {str(index): np.mean(epoch_results['per_query_results'][query])
+                                              for index, query in enumerate(query_order[:current_query_index + 1])},
+        f'{name} Per-Query Accuracy (list)': np.array([np.mean(epoch_results['per_query_results'][query])
+                                                       for query in query_order[:current_query_index + 1]]),
+    }
+
+    log_dict.update({f'{name} Accuracy, Query #{index + 1}': np.mean(epoch_results['per_query_results'][query])
+                     for index, query in enumerate(query_order[:current_query_index + 1])})
+
+    if current_query_index > 0:
+        log_dict[f'{name} Mean Previous-Query Accuracy'] = np.mean(
+            [np.mean(epoch_results['per_query_results'][query])
+             for query in query_order[:current_query_index]])
+
+    return log_dict

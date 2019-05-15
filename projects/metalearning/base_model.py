@@ -141,10 +141,10 @@ class BasicModel(nn.Module):
             per_query_results[q].append(c)
 
         results = dict(
-            accuracy=accuracy,
+            accuracy=accuracy.item(),
             loss=loss.item(),
             auc=auc,
-            pred=pred,
+            pred=pred.item(),
             per_query_results=per_query_results
         )
 
@@ -208,10 +208,10 @@ class BasicModel(nn.Module):
             per_query_results[q].append(c)
 
         results = dict(
-            accuracy=accuracy,
+            accuracy=accuracy.item(),
             loss=loss.item(),
             auc=auc,
-            pred=pred,
+            pred=pred.item(),
             per_query_results=per_query_results
         )
 
@@ -374,44 +374,45 @@ def test(model, dataloader, cuda=True, device=None, training=False):
     test_results = defaultdict(list)
     test_results['per_query_results'] = defaultdict(list)
 
-    for batch in dataloader:
-        if model.use_query:
-            X, y, Q = batch
+    with torch.no_grad():
+        for batch in dataloader:
+            if model.use_query:
+                X, y, Q = batch
 
-        else:
-            X, y = batch
-            Q = None
+            else:
+                X, y = batch
+                Q = None
 
-        if cuda:
-            X = X.to(device)
-            y = y.to(device)
-            if Q is not None: Q = Q.to(device)
+            if cuda:
+                X = X.to(device)
+                y = y.to(device)
+                if Q is not None: Q = Q.to(device)
 
-        images = Variable(X)
-        labels = Variable(y).long()
-        if Q is not None:
-            queries = Variable(Q).float()
-            results = model.test_(images, labels, queries)
-        else:
-            results = model.test_(images, labels)
+            images = Variable(X)
+            labels = Variable(y).long()
+            if Q is not None:
+                queries = Variable(Q).float()
+                results = model.test_(images, labels, queries)
+            else:
+                results = model.test_(images, labels)
 
-        test_results['accuracies'].append(results['accuracy'])
-        test_results['losses'].append(results['loss'])
-        if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
-        if model.compute_correct_rank: test_results['correct_rank'].extend(results['correct_rank'])
+            test_results['accuracies'].append(results['accuracy'])
+            test_results['losses'].append(results['loss'])
+            if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
+            if model.compute_correct_rank: test_results['correct_rank'].extend(results['correct_rank'])
 
-        for query in results['per_query_results']:
-            test_results['per_query_results'][query].extend(results['per_query_results'][query])
+            for query in results['per_query_results']:
+                test_results['per_query_results'][query].extend(results['per_query_results'][query])
 
-    model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
-    mean_loss = np.mean(test_results['losses'])
-    model.results['test_losses'].append(mean_loss)
-    model.results['test_aucs'].append(np.mean(test_results['aucs']))
-    if model.compute_correct_rank: model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
-    model.results['test_per_query_accuracies'].append(
-        {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
+        model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
+        mean_loss = np.mean(test_results['losses'])
+        model.results['test_losses'].append(mean_loss)
+        model.results['test_aucs'].append(np.mean(test_results['aucs']))
+        if model.compute_correct_rank: model.results['test_correct_rank'].append(np.mean(test_results['correct_rank']))
+        model.results['test_per_query_accuracies'].append(
+            {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
 
-    if training: model.post_test(mean_loss, len(model.results['test_losses']))
+        if training: model.post_test(mean_loss, len(model.results['test_losses']))
 
     return test_results
 

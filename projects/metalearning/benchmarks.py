@@ -186,7 +186,7 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
             # Test the model to get a baseline for the forgetting curves
             test_results = test(model, test_dataloader, cuda, device, True)
             print_status(model, epoch, f'PRE-TASK {current_query_index + 1}', test_results)
-            log_results = create_log_results_dict(0, query_order, total_training_size, test_results)
+            log_results = create_log_results_dict(current_query_index, query_order, total_training_size, test_results)
             wandb.log(log_results)
 
         if epoch % epochs_to_graph == 0:

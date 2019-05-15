@@ -47,7 +47,7 @@ def save(save_path):
         
         folder, filename = os.path.split(save_path)
         os.makedirs(folder, exist_ok=True)
-        plt.savefig(save_path, bbox_inches='tight')
+        plt.savefig(save_path, bbox_inches='tight', facecolor=plt.gcf().get_facecolor(), edgecolor='none')
 
 
 def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples, 
@@ -432,7 +432,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           dimension_indices=range(len(CONDITION_ANALYSES_FIELDS)),
                                           num_tasks_trained_highlight_first_time=None, 
                                           add_subfigure_texts=False, add_colorbars=True,
-                                          save_path=None, external_axes=None):
+                                          save_path=None, external_axes=None, num_times_trained_title='',
+                                          num_tasks_trained_title=''):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6.5
@@ -471,7 +472,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
             
         results = result_set[dimension_index][data_index]
     
-        title = ''
+        title = num_times_trained_title
         if len(dimension_names) > 1:
             title = dimension_name.capitalize() # None  # sets the default title for this plot
 
@@ -491,7 +492,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
             num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS + ax_index + 1) # NCOLS * dimension_index + 2)
             
         # y_label = dimension_name.capitalize()
-        title = ''
+        title = num_tasks_trained_title
         
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
@@ -885,7 +886,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
     
         title = ''
         if len(per_query_replication) > 1:
-            title = f'Conv-{replication_level} query modulation'
+            title = f'Conv-{replication_level} modulation'
 
         x_label = None
         # if replication_level_for_axes + 1 == COMPARISON_NROWS:

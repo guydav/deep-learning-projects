@@ -65,38 +65,8 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 
         total_training_size += len(train_dataloader.dataset)
 
-        log_results = {
-            'Total Train Size': total_training_size,
-            'Train Accuracy': np.mean(train_results['accuracies']),
-            'Train Loss': np.mean(train_results['losses']),
-            'Train AUC': np.mean(train_results['aucs']),
-            'Train Per-Query Accuracy (dict)': {str(index): np.mean(train_results['per_query_results'][query])
-                                                for index, query in enumerate(query_order[:current_query_index + 1])},
-            'Train Per-Query Accuracy (list)': np.array([np.mean(train_results['per_query_results'][query])
-                                                         for query in query_order[:current_query_index + 1]]),
-            'Test Accuracy': np.mean(test_results['accuracies']),
-            'Test Loss': np.mean(test_results['losses']),
-            'Test AUC': np.mean(test_results['aucs']),
-            'Test Per-Query Accuracy (dict)': {str(index): np.mean(test_results['per_query_results'][query])
-                                                for index, query in enumerate(query_order[:current_query_index + 1])},
-            'Test Per-Query Accuracy (list)': np.array([np.mean(test_results['per_query_results'][query])
-                                                        for query in query_order[:current_query_index + 1]]),
-        }
-
-        log_results.update({f'Train Accuracy, Query #{index + 1}': np.mean(train_results['per_query_results'][query])
-                            for index, query in enumerate(query_order[:current_query_index + 1])})
-
-        log_results.update({f'Test Accuracy, Query #{index + 1}': np.mean(test_results['per_query_results'][query])
-                            for index, query in enumerate(query_order[:current_query_index + 1])})
-
-        if current_query_index > 0:
-            log_results['Train Mean Previous-Query Accuracy'] = np.mean(
-                [np.mean(train_results['per_query_results'][query])
-                 for query in query_order[:current_query_index]])
-
-            log_results['Test Mean Previous-Query Accuracy'] = np.mean(
-                [np.mean(test_results['per_query_results'][query])
-                 for query in query_order[:current_query_index]])
+        log_results = create_log_results_dict(current_query_index, query_order, total_training_size, test_results,
+                                              train_results)
 
         # for k, v in log_results.items():
         #     print(f'{k}: {v}')
@@ -194,9 +164,6 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
 
         log_results = create_log_results_dict(current_query_index, query_order, total_training_size, test_results,
                                               train_results)
-
-        # for k, v in log_results.items():
-        #     print(f'{k}: {v}')
 
         wandb.log(log_results)
 

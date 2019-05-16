@@ -186,6 +186,8 @@ if __name__ == '__main__':
     model.load_model(current_epoch)
     model = model.cuda()
 
+    if args.debug: print('After model.cuda()')
+
     # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
     # os.environ['WANDB_RESUME'] = 'must'
     wandb.init(entity='meta-learning-scaling', project=args.wandb_project)
@@ -219,9 +221,13 @@ if __name__ == '__main__':
         wandb.config.latin_square_random_seed = args.latin_square_random_seed
         wandb.config.latin_square_index = args.latin_square_index
 
+    if args.debug: print('After wandb init')
+
     train_epoch_func = train_epoch
     if args.maml:
         train_epoch_func = maml_train_epoch
+
+    if args.debug: print('Calling sequential bechmark')
 
     sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,

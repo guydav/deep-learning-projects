@@ -5,7 +5,7 @@ import numpy as np
 import h5py
 import os
 import pickle
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import itertools
 from datetime import datetime
 
@@ -439,6 +439,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         self.query_order = query_order
         self.current_query_index = 0
         self._cache_images_by_query()
+        self.current_epoch_queries = []
 
         self.start_epoch()
 
@@ -504,22 +505,8 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         self.current_query_index += 1
 
-    def start_epoch(self, debug=False, depth=0):
-        """
-        Sample the images for each coreset query to be used for the current epoch. This supports a number of
-        different variations:
-
-        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
-        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
-        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
-
-        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
-        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
-        assign the remaining images to the current task.
-        """
-        self.current_epoch_queries = []
-
-        if debug: debug_print('Starting start_epoch')
+    def _allocate_images_to_tasks(self, depth):
+        task_to_images = OrderedDict()
 
         if depth >= self.num_sampling_attempts:
             raise ValueError('Warning, exceeded maximum number of sampling attempts, this is not great')
@@ -535,19 +522,18 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         for previous_query_index in range(self.current_query_index):
             previous_query = self.query_order[previous_query_index]
 
-            if debug: debug_print(f'Starting previous query #{previous_query_index} = {previous_query}')
-
             # This would happen in our test loader:
             if self.previous_query_coreset_size == self.num_images:
-                self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                           itertools.cycle([previous_query]))))
+                task_to_images[previous_query] = range(self.num_images)
 
             else:
                 if self.coreset_size_per_query:
                     positive_size = self.previous_query_coreset_size // 2
                     negative_size = positive_size
-                    positive_queries = np.random.choice(list(self.positive_images[previous_query]), positive_size, False)
-                    negative_queries = np.random.choice(list(self.negative_images[previous_query]), negative_size, False)
+                    positive_queries = np.random.choice(list(self.positive_images[previous_query]), positive_size,
+                                                        False)
+                    negative_queries = np.random.choice(list(self.negative_images[previous_query]), negative_size,
+                                                        False)
                     current_task_coreset = np.concatenate((positive_queries, negative_queries))
 
                 else:  # shared coreset among all queries
@@ -558,43 +544,131 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
                     while smaller_proportion < self.imbalance_threshold \
                             and attempt_count < self.num_sampling_attempts:
-
                         attempt_count += 1
-                        if debug: debug_print(f'Starting attempt #{attempt_count}')
                         image_list = list(image_set)
-                        if debug: debug_print(f'Casted coreset to a list')
                         current_task_coreset = np.random.choice(image_list, current_coreset_size, False)
-                        if debug: debug_print(f'Sampled current task coreset')
 
                         # negative_count = sum([x in self.negative_images[previous_query]
                         # for x in current_task_coreset])
                         positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
                         smaller_proportion = min(positive_count / current_coreset_size,
                                                  1 - (positive_count / current_coreset_size))
-                        if debug: debug_print(f'Computed counts and proportions')
 
                     if attempt_count >= self.num_sampling_attempts:
                         print(f'Warning, failed to balance query #{previous_query_index + 1}, restarting...')
-                        return self.start_epoch(debug, depth + 1)
+                        return self._allocate_images_to_tasks(depth + 1)
 
-                    if debug: debug_print(f'Successfully generated coreset for current task')
                     image_set = image_set.difference(set(current_task_coreset))
 
-                self.current_epoch_queries.extend(list(zip(current_task_coreset, itertools.cycle([previous_query]))))
+                task_to_images[previous_query] = current_task_coreset
+
+        current_query = self.query_order[self.current_query_index]
 
         if self.coreset_size_per_query:  # use the entire training set for the previous query
-            self.current_epoch_queries.extend(list(zip(range(self.num_images),
-                                                   itertools.cycle([self.query_order[self.current_query_index]]))))
+            task_to_images[current_query] = range(self.num_images)
+
         else:
             if self.current_query_index == 0:
                 image_set = set(np.random.choice(self.num_images,
                                                  self.num_images - self.previous_query_coreset_size,
                                                  False))
 
-            self.current_epoch_queries.extend(list(zip(image_set,
-                                                       itertools.cycle([self.query_order[self.current_query_index]]))))
+            task_to_images[current_query] = image_set
 
-        # print(self.current_query_index, len(self), len(self.current_epoch_queries))
+        return task_to_images
+
+    def start_epoch(self, debug=False):
+        """
+        Sample the images for each coreset query to be used for the current epoch. This supports a number of
+        different variations:
+
+        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
+        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
+        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
+
+        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
+        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
+        assign the remaining images to the current task.
+        """
+        task_to_images = self._allocate_images_to_tasks()
+
+        self.current_epoch_queries = []
+        for task, images in task_to_images.items():
+            self.current_epoch_queries.extend(list(zip(images, itertools.cycle(task))))
+
+    def _compute_indices(self, index):
+        return self.current_epoch_queries[index]
+
+
+class BalancedBatchesMetaLearningDataset(SequentialBenchmarkMetaLearningDataset):
+    def __init__(self, in_file, batch_size, benchmark_dimension, random_seed,
+                 previous_query_coreset_size, query_order, single_dimension=True,
+                 coreset_size_per_query=False, transform=None,
+                 start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.2, num_sampling_attempts=20):
+
+        super(SequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file, benchmark_dimension, random_seed, previous_query_coreset_size,
+            query_order, single_dimension, coreset_size_per_query, transform,
+            start_index, end_index, return_indices, num_dimensions, features_per_dimension,
+            imbalance_threshold, num_sampling_attempts)
+
+        self.batch_size = batch_size
+        self.num_batches_per_epoch = self.num_images // self.batch_size
+
+    def start_epoch(self, debug=False):
+        """
+        Sample the images for each coreset query to be used for the current epoch. This supports a number of
+        different variations:
+
+        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
+        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
+        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
+
+        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
+        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
+        assign the remaining images to the current task.
+        """
+        task_to_images = self._allocate_images_to_tasks()
+        for task in task_to_images:
+            image_list = list(task_to_images[task])
+            np.random.shuffle(image_list)
+            task_to_images[task] = image_list
+
+        # if only one task, shuffle its examples, call it a day
+        if self.current_query_index == 0:
+            first_task = self.query_order[0]
+            first_task_images = task_to_images[first_task]
+            self.current_epoch_queries = list(zip(first_task_images, itertools.cycle([first_task])))
+            return
+
+        # more than one task -- we can deal with the current task first
+        # since it occupies half of every epoch
+        current_task = self.query_order[self.current_query_index]
+        current_task_images = task_to_images[current_task]
+        current_task_per_batch = self.batch_size // 2
+
+        batches = [list(zip(current_task_images[i * current_task_per_batch:(i + 1) * current_task_per_batch],
+                            itertools.cycle([current_task])))
+                   for i in range(self.num_batches_per_epoch)]
+
+        # move onto the previous tasks
+        prev_task_per_batch = current_task_per_batch // self.current_query_index
+        num_to_round_up = current_task_per_batch % self.current_query_index
+
+        for batch_index in range(self.num_batches_per_epoch):
+            tasks_rounding_up = sorted(self.query_order[:self.current_query_index],
+                                       key=lambda x: len(task_to_images[x]),
+                                       reverse=True)[:num_to_round_up]
+
+            for task in self.query_order[:self.current_query_index]:
+                num_task_examples = prev_task_per_batch + 1 * (task in tasks_rounding_up)
+                batches[batch_index].extend(list(zip(task_to_images[task][:num_task_examples],
+                                                     itertools.cycle([task]))))
+                task_to_images[task] = task_to_images[task][num_task_examples:]
+
+        self.current_epoch_queries = [pair for batch in batches for pair in batch]
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]

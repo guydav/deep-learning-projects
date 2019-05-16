@@ -24,10 +24,12 @@ class MamlModel(BasicModel):
 
         # self.optimizer is actually the meta-optimizer in MAML parlance
         self.fast_weight_lr = fast_weight_lr
-        self.fast_weight_optimizer = optim.SGD(self.parameters(), self.fast_weight_lr)
 
     def train_(self, input_img, label, query=None):
         raise NotImplemented('This method should never be called on the MAML model')
+
+    def _create_fast_weight_optimizer(self):
+        self.fast_weight_optimizer = optim.SGD(self.parameters(), self.fast_weight_lr)
 
     def maml_train_(self, X_train, Q_train, y_train, X_meta_train, Q_meta_train, y_meta_train,
                     active_tasks, debug=False):
@@ -35,6 +37,7 @@ class MamlModel(BasicModel):
         """
         if self.optimizer is None:
             self._create_optimizer()
+            self._create_fast_weight_optimizer()
 
         meta_objective_losses = []
         meta_train_correct = []

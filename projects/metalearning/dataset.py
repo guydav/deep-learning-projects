@@ -505,7 +505,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         """
         self.current_query_index += 1
 
-    def _allocate_images_to_tasks(self, depth):
+    def _allocate_images_to_tasks(self, depth=0):
         task_to_images = OrderedDict()
 
         if depth >= self.num_sampling_attempts:

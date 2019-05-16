@@ -7,7 +7,7 @@ DEFAULT_ACCURACY_THRESHOLD = 0.95
 def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold=DEFAULT_ACCURACY_THRESHOLD,
                          threshold_all_queries=True,
                          num_epochs=1000, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
-                         watch=True, debug=False, save_name='model'):
+                         watch=True, debug=False, save_name='model', train_epoch_func=train_epoch):
     """
     Execute the sequential benchmark as described in the paper.
     :param model: Which model to train and test according to the benchmark
@@ -26,12 +26,14 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
     :param watch: Whether or not to watch the model
     :param debug: Whether or not to print debug prints
     :param save_name: A save name for saving results to weights & biases
+    :param train_epoch_func: Allowing support to using a second train_epoch function, for MAML purposes
     :return:
     """
 
     if epochs_to_graph is None:
         epochs_to_graph = 10
 
+    device = None
     if cuda:
         device = next(model.parameters()).device
 
@@ -49,7 +51,7 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         test_dataloader.dataset.start_epoch(debug)
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')
 
-        train_results = train_epoch(model, train_dataloader, cuda, device)
+        train_results = train_epoch_func(model, train_dataloader, cuda, device)
         print_status(model, epoch, 'TRAIN', train_results)
 
         if save:

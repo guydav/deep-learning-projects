@@ -196,66 +196,7 @@ class SmallerDropoutFCOutputModel(nn.Module):
 #         else:
 #             return F.softmax(x, dim=1)
 
-
-class PoolingDropoutCNNMLP(BasicModel):
-    """
-    A full model combining the more advanced versions of the convolutional input module (with pooling and dropout
-    support) and fully-connected module (with dropout support). Also adding a learning rate scheduler, support for
-    using weight decay, and alternative loss functions.
-    """
-    def __init__(self, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
-                 conv_dropout=True, conv_p_dropout=0.2,
-                 mlp_layer_sizes=(256, 256, 256, 256),
-                 mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
-                 conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
-                 use_mse=False, loss=None, compute_correct_rank=False,
-                 name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
-        """
-        :param query_length: What length of query to expect; defaults to 30
-        :param conv_filter_sizes: How many filters to use in each convolutional filter group
-        :param conv_dropout: Should spatial dropout be used on the convolutional layers
-        :param conv_p_dropout: If using spatial dropout, what dropout proabability?
-        :param mlp_layer_sizes: What sizes to use for the fully-connected (MLP, multilayer perceptron)
-        :param mlp_dropout: Should dropout be used in the MLP?
-        :param mlp_p_dropout: If using dropout, what dropout probability to use
-        :param use_lr_scheduler: Should a learning rate scheduler to reduce the learning rate on plateau be used?
-        :param lr_scheduler_patience: If using a learning rate scheduler, how long a plateau to move before?
-        :param conv_output_size: What output size (once flattened) should be expected from the CNN?
-        :param lr: Learning rate to use
-        :param weight_decay: Weight decay to use
-        :param num_classes: How many classes to support
-        :param use_mse: Whether or not to use the mean squared error (MSE) loss function
-        :param loss: Which loss function to use, if not the defaul one
-        :param compute_correct_rank: Whether or not to compute the correct rank of every mistaken classification
-        :param name: Which name to save checkpoints under
-        :param save_dir: Which directory to save checkpoints to
-        """
-        super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
-                                                   use_mse=use_mse, loss=loss,
-                                                   use_query=query_length != 0,
-                                                   compute_correct_rank=compute_correct_rank)
-
-        
-        self.query_length = query_length
-        self.conv = self._create_conv_module(conv_filter_sizes, conv_dropout, conv_p_dropout)
-        self.fc1 = nn.Linear(conv_output_size + query_length, mlp_layer_sizes[0])  # query concatenated to all
-        output_size = num_classes
-        
-        if use_mse:
-            if num_classes == 2:
-                output_size = 1
-                fc_output_func = lambda x: torch.sigmoid(x)
-            else:
-                fc_output_func = lambda x: F.softmax(x, dim=1)
-        else:
-            fc_output_func = lambda x: F.log_softmax(x, dim=1)
-
-        self.fcout = self._create_fc_module(fc_output_func, mlp_dropout, mlp_layer_sizes, mlp_p_dropout, output_size)
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.use_lr_scheduler = use_lr_scheduler
-        self.lr_scheduler_patience = lr_scheduler_patience
-
+class CNNMLPMixIn:
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
         return PoolingDropoutConvInputModel(conv_filter_sizes,
                                             conv_dropout,
@@ -294,6 +235,66 @@ class PoolingDropoutCNNMLP(BasicModel):
         x_ = F.relu(x_)
 
         return self.fcout(x_)
+
+
+class PoolingDropoutCNNMLP(BasicModel, CNNMLPMixIn):
+    """
+    A full model combining the more advanced versions of the convolutional input module (with pooling and dropout
+    support) and fully-connected module (with dropout support). Also adding a learning rate scheduler, support for
+    using weight decay, and alternative loss functions.
+    """
+    def __init__(self, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
+                 conv_dropout=True, conv_p_dropout=0.2,
+                 mlp_layer_sizes=(256, 256, 256, 256),
+                 mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
+                 conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
+                 use_mse=False, loss=None, compute_correct_rank=False,
+                 name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
+        """
+        :param query_length: What length of query to expect; defaults to 30
+        :param conv_filter_sizes: How many filters to use in each convolutional filter group
+        :param conv_dropout: Should spatial dropout be used on the convolutional layers
+        :param conv_p_dropout: If using spatial dropout, what dropout proabability?
+        :param mlp_layer_sizes: What sizes to use for the fully-connected (MLP, multilayer perceptron)
+        :param mlp_dropout: Should dropout be used in the MLP?
+        :param mlp_p_dropout: If using dropout, what dropout probability to use
+        :param use_lr_scheduler: Should a learning rate scheduler to reduce the learning rate on plateau be used?
+        :param lr_scheduler_patience: If using a learning rate scheduler, how long a plateau to move before?
+        :param conv_output_size: What output size (once flattened) should be expected from the CNN?
+        :param lr: Learning rate to use
+        :param weight_decay: Weight decay to use
+        :param num_classes: How many classes to support
+        :param use_mse: Whether or not to use the mean squared error (MSE) loss function
+        :param loss: Which loss function to use, if not the defaul one
+        :param compute_correct_rank: Whether or not to compute the correct rank of every mistaken classification
+        :param name: Which name to save checkpoints under
+        :param save_dir: Which directory to save checkpoints to
+        """
+        super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
+                                                   use_mse=use_mse, loss=loss,
+                                                   use_query=query_length != 0,
+                                                   compute_correct_rank=compute_correct_rank)
+        CNNMLPMixIn.__init__(self)
+        
+        self.query_length = query_length
+        self.conv = self._create_conv_module(conv_filter_sizes, conv_dropout, conv_p_dropout)
+        self.fc1 = nn.Linear(conv_output_size + query_length, mlp_layer_sizes[0])  # query concatenated to all
+        output_size = num_classes
+        
+        if use_mse:
+            if num_classes == 2:
+                output_size = 1
+                fc_output_func = lambda x: torch.sigmoid(x)
+            else:
+                fc_output_func = lambda x: F.softmax(x, dim=1)
+        else:
+            fc_output_func = lambda x: F.log_softmax(x, dim=1)
+
+        self.fcout = self._create_fc_module(fc_output_func, mlp_dropout, mlp_layer_sizes, mlp_p_dropout, output_size)
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.use_lr_scheduler = use_lr_scheduler
+        self.lr_scheduler_patience = lr_scheduler_patience
 
 
 class QueryModulatingPoolingDropoutConvInputModel(nn.Module):

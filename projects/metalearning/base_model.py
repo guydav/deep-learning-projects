@@ -156,70 +156,71 @@ class BasicModel(nn.Module):
 
     def test_(self, input_img, label, query=None):
         """
-        This this mode. Functionally almost entirely the same as the train_ function, but without
-        taking a backward step through the loss and optimizer.
+        Test mode. Functionally almost entirely the same as the train_ function, but without
+        taking a backward step through the loss and optimizer, and with an explcit no_grad wrapper
         :param input_img: The batch of inputs to run through the model, shaped
             [batch_size x channels x width x height]
         :param label: the correct prediction for this image, used in order to compute the loss
         :param query: The query, if this model utilizes it
         :return: A dict of metrics for this batch: accuracy, loss, AUC, and predictions
         """
-        output = self(input_img, query)
+        with torch.no_grad():
+            output = self(input_img, query)
 
-        np_labels = label.data.cpu().numpy()
-        if self.multiclass:
-            multiclass_labels = self.mlb.fit_transform(np.expand_dims(np_labels, 1))
-
-        if self.use_mse:
-            # Per-class output in multiclass, softmax activation
+            np_labels = label.data.cpu().numpy()
             if self.multiclass:
-                tensor_labels = torch.from_numpy(multiclass_labels).float().to(output.device)
-                loss = self.loss(output, tensor_labels)
+                multiclass_labels = self.mlb.fit_transform(np.expand_dims(np_labels, 1))
+
+            if self.use_mse:
+                # Per-class output in multiclass, softmax activation
+                if self.multiclass:
+                    tensor_labels = torch.from_numpy(multiclass_labels).float().to(output.device)
+                    loss = self.loss(output, tensor_labels)
+                    pred = output.data.max(1)[1]
+
+                # Single output unit in the two-class case, sigmoid activation
+                else:
+                    output = torch.squeeze(output)
+                    loss = self.loss(output, label.to(torch.float))
+                    pred = output.data > self.mse_threshold
+                    pred = pred.to(torch.long)
+
+            else:
+                loss = self.loss(output, label)
                 pred = output.data.max(1)[1]
 
-            # Single output unit in the two-class case, sigmoid activation
-            else:
-                output = torch.squeeze(output)
-                loss = self.loss(output, label.to(torch.float))
-                pred = output.data > self.mse_threshold
-                pred = pred.to(torch.long)
+            correct = pred.eq(label.data).cpu()
+            accuracy = correct.sum() * 100. / len(label)
 
-        else:
-            loss = self.loss(output, label)
-            pred = output.data.max(1)[1]
+            try:
+                np_predictions = pred.cpu().numpy()
+                if self.multiclass:
+                    multiclass_predictions = self.mlb.fit_transform(np.expand_dims(np_predictions, 1))
+                    auc = roc_auc_score(multiclass_labels, multiclass_predictions)
 
-        correct = pred.eq(label.data).cpu()
-        accuracy = correct.sum() * 100. / len(label)
+                else:
+                    auc = roc_auc_score(np_labels, np_predictions)
 
-        try:
-            np_predictions = pred.cpu().numpy()
-            if self.multiclass:
-                multiclass_predictions = self.mlb.fit_transform(np.expand_dims(np_predictions, 1))
-                auc = roc_auc_score(multiclass_labels, multiclass_predictions)
+            except ValueError:
+                auc = None
 
-            else:
-                auc = roc_auc_score(np_labels, np_predictions)
+            per_query_results = defaultdict(list)
+            for q, c in zip(np.argmax(query.cpu().numpy(), 1), correct.numpy()):
+                per_query_results[q].append(c)
 
-        except ValueError:
-            auc = None
+            results = dict(
+                accuracy=accuracy.item(),
+                loss=loss.item(),
+                auc=auc,
+                pred=pred.data,
+                per_query_results=per_query_results
+            )
 
-        per_query_results = defaultdict(list)
-        for q, c in zip(np.argmax(query.cpu().numpy(), 1), correct.numpy()):
-            per_query_results[q].append(c)
+            if self.compute_correct_rank:
+                answer_indices = self.num_classes - np.argsort(np.argsort(output.data.cpu().numpy(), 1), 1)
+                results['correct_rank'] = answer_indices[np.arange(output.shape[0]), np_labels]
 
-        results = dict(
-            accuracy=accuracy.item(),
-            loss=loss.item(),
-            auc=auc,
-            pred=pred.data,
-            per_query_results=per_query_results
-        )
-
-        if self.compute_correct_rank:
-            answer_indices = self.num_classes - np.argsort(np.argsort(output.data.cpu().numpy(), 1), 1)
-            results['correct_rank'] = answer_indices[np.arange(output.shape[0]), np_labels]
-
-        return results
+            return results
 
     def save_model(self, epoch=None, save_results=True, **kwargs):
         """

@@ -62,6 +62,10 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
+parser.add_argument('--maml', action='store_true')
+DEFAULT_FAST_WEIGHT_LEARNING_RATE = 2.5e-4
+parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
+
 parser.add_argument('--debug', action='store_true')
 
 
@@ -122,6 +126,18 @@ if __name__ == '__main__':
     total_epochs = args.max_epochs
     threshold_all_queries = bool(args.threshold_all_queries)
 
+    train_batch_size = None
+    shuffle_train = None
+    train_dataset_kwargs = dict(
+        previous_query_coreset_size=train_coreset_size,
+        coreset_size_per_query=train_coreset_size_per_query,
+    )
+
+    if args.maml:
+        train_batch_size = batch_size // 2
+        shuffle_train = True
+        train_dataset_kwargs['batch_size'] = train_batch_size
+
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,
                                    batch_size=batch_size,
@@ -136,33 +152,39 @@ if __name__ == '__main__':
                                        random_seed=dataset_random_seed,
                                        query_order=query_order
                                    ),
-                                   train_dataset_kwargs=dict(
-                                       previous_query_coreset_size=train_coreset_size,
-                                       coreset_size_per_query=train_coreset_size_per_query,
-                                   ),
+                                   train_dataset_class=BalancedBatchesMetaLearningDataset,
+                                   train_dataset_kwargs=train_dataset_kwargs,
                                    test_dataset_kwargs=dict(
                                        previous_query_coreset_size=test_coreset_size,
                                        coreset_size_per_query=True,
-                                   ))
+                                   ),
+                                   shuffle_train=shuffle_train,
+                                   train_batch_size=train_batch_size)
 
     learning_rate = args.learning_rate
     weight_decay = args.weight_decay
 
-    sequential_benchmark_test_model = PoolingDropoutCNNMLP(
-        query_length=30,
-        conv_filter_sizes=(16, 32, 48, 64),
-        conv_output_size=4480,
-        mlp_layer_sizes=(512, 512, 512, 512),
-        lr=learning_rate,
-        weight_decay=weight_decay,
-        use_lr_scheduler=False,
-        conv_dropout=False,
-        mlp_dropout=False,
-        name=f'{args.name}-{dataset_random_seed}',
-        save_dir=save_dir)
+    model_kwargs = dict(query_length=30,
+                        conv_filter_sizes=(16, 32, 48, 64),
+                        conv_output_size=4480,
+                        mlp_layer_sizes=(512, 512, 512, 512),
+                        lr=learning_rate,
+                        weight_decay=weight_decay,
+                        use_lr_scheduler=False,
+                        conv_dropout=False,
+                        mlp_dropout=False,
+                        name=f'{args.name}-{dataset_random_seed}',
+                        save_dir=save_dir)
 
-    sequential_benchmark_test_model.load_model(current_epoch)
-    sequential_benchmark_test_model = sequential_benchmark_test_model.cuda()
+    if args.maml:
+        model_kwargs['fast_weight_lr'] = args.fast_weight_learning_rate
+        model = MamlPoolingDropoutCNNMLP(**model_kwargs)
+
+    else:
+        model = PoolingDropoutCNNMLP(**model_kwargs)
+
+    model.load_model(current_epoch)
+    model = model.cuda()
 
     # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
     # os.environ['WANDB_RESUME'] = 'must'
@@ -176,7 +198,7 @@ if __name__ == '__main__':
     wandb.run.description = description
     wandb.run.save()
 
-    current_model = sequential_benchmark_test_model
+    current_model = model
 
     wandb.config.lr = current_model.lr
     wandb.config.decay = current_model.weight_decay
@@ -190,14 +212,22 @@ if __name__ == '__main__':
     wandb.config.accuracy_threshold = accuracy_threshold
     wandb.config.epochs = total_epochs
 
+    if args.maml:
+        wandb.config.fast_weight_lr = args.fast_weight_learning_rate
+
     if args.use_latin_square:
         wandb.config.latin_square_random_seed = args.latin_square_random_seed
         wandb.config.latin_square_index = args.latin_square_index
 
-    sequential_benchmark(sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
+    train_epoch_func = train_epoch
+    if args.maml:
+        train_epoch_func = maml_train_epoch
+
+    sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,
                          num_epochs=total_epochs - current_epoch,
                          epochs_to_graph=total_epochs + 1,
                          start_epoch=current_epoch,
                          debug=args.debug,
-                         save_name=f'{args.name}-{dataset_random_seed}')
+                         save_name=f'{args.name}-{dataset_random_seed}',
+                         train_epoch_func=train_epoch_func)

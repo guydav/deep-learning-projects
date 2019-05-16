@@ -782,7 +782,9 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
                                normalization_dataset_class=MetaLearningH5DatasetFromDescription,
-                               train_dataset_class=None, test_dataset_class=None):
+                               train_dataset_class=None, test_dataset_class=None,
+                               train_shuffle=None, test_shuffle=None,
+                               train_batch_size=None, test_batch_size=None):
     """
     Helper function to create both the train and test normalized datasets.
     :param dataset_path: Which HDF5 file to load the dataset from
@@ -903,14 +905,22 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     normalized_train_dataset = train_dataset_class(dataset_path, transform=train_transformer,
                                              end_index=test_train_split_index,
                                              return_indices=return_indices, **train_dataset_kwargs)
-    train_dataloader = DataLoader(normalized_train_dataset, batch_size=batch_size,
-                                  shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
+    if train_shuffle is None:
+        train_shuffle = shuffle
+    if train_batch_size is None:
+        train_batch_size = batch_size
+    train_dataloader = DataLoader(normalized_train_dataset, batch_size=train_batch_size,
+                                  shuffle=train_shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
     normalized_test_dataset = test_dataset_class(dataset_path, transform=test_transformer,  # augment only in train
                                             start_index=test_train_split_index,
                                             return_indices=return_indices, **test_dataset_kwargs)
-    test_dataloader = DataLoader(normalized_test_dataset, batch_size=batch_size,
-                                 shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
+    if test_shuffle is None:
+        test_shuffle = shuffle
+    if test_batch_size is None:
+        test_batch_size = batch_size
+    test_dataloader = DataLoader(normalized_test_dataset, batch_size=test_batch_size,
+                                 shuffle=test_shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
     return normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader
 

@@ -24,6 +24,7 @@ class MamlModel(BasicModel):
 
         # self.optimizer is actually the meta-optimizer in MAML parlance
         self.fast_weight_lr = fast_weight_lr
+        self.fast_weight_optimizer = optim.SGD(self.parameters(), self.fast_weight_lr)
 
     def train_(self, input_img, label, query=None):
         raise NotImplemented('This method should never be called on the MAML model')
@@ -43,9 +44,15 @@ class MamlModel(BasicModel):
         _, train_task_indices = Q_train.max(1)
         _, meta_train_task_indices = Q_meta_train.max(1)
 
-        meta_train_model_copy = copy.deepcopy(self)
+        pre_training_weights = copy.deepcopy(self.state_dict())
+        need_load = False
 
         for task in active_tasks:
+            # No need to load the first time around
+            if need_load:
+                self.load_state_dict(pre_training_weights)
+            need_load = True
+
             # extract training and meta-training data for task
             train_task_examples = train_task_indices == task
             X_train_task = X_train[train_task_examples]
@@ -60,22 +67,29 @@ class MamlModel(BasicModel):
             if debug: print(task, torch.sum(train_task_examples), torch.sum(meta_train_task_examples))
 
             # train on task
+            self.fast_weight_optimizer.zero_grad()
             task_output = self(X_train_task, Q_train_task)
             task_loss = self.loss(task_output, y_train_task)
-            task_grad = autograd.grad(task_loss, self.parameters())
-            task_fast_weights = list(map(lambda p, g: p - self.fast_weight_lr * g, self.parameters(), task_grad))
+            task_loss.backward()
+            self.fast_weight_optimizer.step()
+            # task_grad = autograd.grad(task_loss, self.parameters())
+            # task_fast_weights = list(map(lambda p, g: p - self.fast_weight_lr * g, self.parameters(), task_grad))
 
             # meta-train on task
             with torch.no_grad():
-                meta_train_model_state = meta_train_model_copy.state_dict()
-                param_names = meta_train_model_state.keys()
-                for name, fast_weight in zip(param_names, task_fast_weights):
-                    meta_train_model_state[name] = fast_weight
+                # meta_train_model_state = meta_train_model_copy.state_dict()
+                # param_names = meta_train_model_state.keys()
+                # for name, fast_weight in zip(param_names, task_fast_weights):
+                #     meta_train_model_state[name] = fast_weight
+                #
+                # meta_train_model_copy.load_state_dict(meta_train_model_state)
 
-                meta_train_model_copy.load_state_dict(meta_train_model_state)
+                # meta_task_output = meta_train_model_copy(X_meta_train_task, Q_meta_train_task)
+                # meta_task_loss = meta_train_model_copy.loss(meta_task_output, y_meta_train_task)
+                # meta_objective_losses.append(meta_task_loss)
 
-                meta_task_output = meta_train_model_copy(X_meta_train_task, Q_meta_train_task)
-                meta_task_loss = meta_train_model_copy.loss(meta_task_output, y_meta_train_task)
+                meta_task_output = self(X_meta_train_task, Q_meta_train_task)
+                meta_task_loss = self.loss(meta_task_output, y_meta_train_task)
                 meta_objective_losses.append(meta_task_loss)
 
                 meta_task_pred = meta_task_output.data.max(1)[1]
@@ -84,6 +98,7 @@ class MamlModel(BasicModel):
                 meta_train_correct.append(meta_task_correct.numpy())
                 meta_train_labels_for_auc.append(y_meta_train_task.data.cpu().numpy())
 
+        self.load_state_dict(pre_training_weights)
         meta_loss = torch.sum(meta_objective_losses) / len(active_tasks)
         self.optimizer.zero_grad()
         meta_loss.backward()

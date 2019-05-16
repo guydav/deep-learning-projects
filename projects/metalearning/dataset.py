@@ -608,7 +608,7 @@ class BalancedBatchesMetaLearningDataset(SequentialBenchmarkMetaLearningDataset)
                  num_dimensions=3, features_per_dimension=(10, 10, 10),
                  imbalance_threshold=0.2, num_sampling_attempts=20):
 
-        super(SequentialBenchmarkMetaLearningDataset, self).__init__(
+        super(BalancedBatchesMetaLearningDataset, self).__init__(
             in_file, benchmark_dimension, random_seed, previous_query_coreset_size,
             query_order, single_dimension, coreset_size_per_query, transform,
             start_index, end_index, return_indices, num_dimensions, features_per_dimension,

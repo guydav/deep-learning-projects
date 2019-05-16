@@ -594,7 +594,7 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
 
         self.current_epoch_queries = []
         for task, images in task_to_images.items():
-            self.current_epoch_queries.extend(list(zip(images, itertools.cycle(task))))
+            self.current_epoch_queries.extend(list(zip(images, itertools.cycle([task]))))
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]

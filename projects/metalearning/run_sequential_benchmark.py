@@ -127,7 +127,7 @@ if __name__ == '__main__':
     threshold_all_queries = bool(args.threshold_all_queries)
 
     train_batch_size = None
-    shuffle_train = None
+    train_shuffle = None
     train_dataset_kwargs = dict(
         previous_query_coreset_size=train_coreset_size,
         coreset_size_per_query=train_coreset_size_per_query,
@@ -135,7 +135,7 @@ if __name__ == '__main__':
 
     if args.maml:
         train_batch_size = batch_size // 2
-        shuffle_train = True
+        train_shuffle = True
         train_dataset_kwargs['batch_size'] = train_batch_size
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                                        previous_query_coreset_size=test_coreset_size,
                                        coreset_size_per_query=True,
                                    ),
-                                   shuffle_train=shuffle_train,
+                                   train_shuffle=train_shuffle,
                                    train_batch_size=train_batch_size)
 
     learning_rate = args.learning_rate

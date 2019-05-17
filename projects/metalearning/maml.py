@@ -47,6 +47,7 @@ class MamlModel(BasicModel):
         _, meta_train_task_indices = Q_meta_train.max(1)
 
         pre_training_weights = copy.deepcopy(self.state_dict())
+        print(pre_training_weights.keys())
         need_load = False
 
         for task in active_tasks:

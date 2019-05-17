@@ -210,9 +210,13 @@ def maml_train_epoch(model, dataloader, cuda=True, device=None,
 
 def split_batch(batch, cuda, device, model):
     if model.use_query:
-        X, y, Q, index = batch
-        print(index[:10])
-        print(index[-10:])
+        if len(batch) == 4:
+            X, y, Q, index = batch
+            print(index[:10])
+            print(index[-10:])
+
+        else:
+            X, y, Q = batch
 
     else:
         X, y = batch

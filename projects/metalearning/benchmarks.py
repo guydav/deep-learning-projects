@@ -147,6 +147,10 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
     test_dataloader.dataset.next_query()  # we need to make sure two queries are active from the first moment
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
+        # TODO: remove once done debugging
+        train_dataloader.dataset.next_query()
+        test_dataloader.dataset.next_query()
+
         train_dataloader.dataset.start_epoch()
         test_dataloader.dataset.start_epoch()
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')

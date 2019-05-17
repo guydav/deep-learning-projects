@@ -46,8 +46,9 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         # TODO: remove once done debugging
-        train_dataloader.dataset.next_query()
-        test_dataloader.dataset.next_query()
+        for _ in range(4):
+            train_dataloader.dataset.next_query()
+            test_dataloader.dataset.next_query()
 
         train_dataloader.dataset.start_epoch(debug)
         test_dataloader.dataset.start_epoch(debug)

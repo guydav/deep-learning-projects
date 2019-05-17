@@ -102,7 +102,7 @@ class MetaLearningH5Dataset(Dataset):
             x = self.transform(x)
 
         if self.return_indices:
-            return x, y, q, index
+            return (x, y, q, index), index
 
         return x, y, q
 
@@ -145,7 +145,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
             x = self.transform(x)
 
         if self.return_indices:
-            return (x, y, q, index), index
+            return (x, y, q), index
 
         return x, y, q
 
@@ -553,8 +553,7 @@ class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescripti
 def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
                                dataset_train_prop=DEFAULT_TRAIN_PROPORTION,
                                pin_memory=True, downsample_size=DOWNSAMPLE_SIZE,
-                               should_flip=True,
-                               shuffle=True, return_indices=False,
+                               should_flip=True, shuffle=True, return_indices=False,
                                dataset_class=MetaLearningH5DatasetFromDescription,
                                dataset_class_kwargs=None, train_dataset_kwargs=None, test_dataset_kwargs=None,
                                normalization_dataset_class=MetaLearningH5DatasetFromDescription,
@@ -586,7 +585,7 @@ def create_normalized_datasets(dataset_path=META_LEARNING_DATA, batch_size=BATCH
     if test_dataset_class is None:
         test_dataset_class = dataset_class
 
-    full_dataset = normalization_dataset_class(dataset_path,return_indices=return_indices)
+    full_dataset = normalization_dataset_class(dataset_path, return_indices=return_indices)
     test_train_split_index = int(full_dataset.num_images * dataset_train_prop)
     print(f'Splitting test-train at {test_train_split_index}')
     del full_dataset

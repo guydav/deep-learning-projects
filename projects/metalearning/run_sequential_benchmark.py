@@ -65,6 +65,7 @@ parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 parser.add_argument('--maml', action='store_true')
 DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
 parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
+parser.add_argument('--return_indices', action='store_true')
 
 parser.add_argument('--debug', action='store_true')
 
@@ -145,7 +146,7 @@ if __name__ == '__main__':
                                    pin_memory=pin_memory,
                                    downsample_size=None,
                                    should_flip=False,
-                                   return_indices=False,
+                                   return_indices=args.return_indices,
                                    dataset_class=SequentialBenchmarkMetaLearningDataset,
                                    dataset_class_kwargs=dict(
                                        benchmark_dimension=benchmark_dimension,

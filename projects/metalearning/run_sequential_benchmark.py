@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     if args.maml:
         train_batch_size = batch_size // 2
-        train_shuffle = True
+        train_shuffle = False
         train_dataset_kwargs['batch_size'] = train_batch_size
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \

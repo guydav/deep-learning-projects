@@ -45,6 +45,10 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
     print(f'Working in query order {query_order}, starting from query #0 ({query_order[0]})')
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
+        # TODO: remove once done debugging
+        train_dataloader.dataset.next_query()
+        test_dataloader.dataset.next_query()
+
         train_dataloader.dataset.start_epoch(debug)
         test_dataloader.dataset.start_epoch(debug)
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')

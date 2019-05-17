@@ -47,7 +47,6 @@ class MamlModel(BasicModel):
         _, meta_train_task_indices = Q_meta_train.max(1)
 
         pre_training_weights = copy.deepcopy(self.state_dict())
-        if debug: print(pre_training_weights['fcout.fc5.weight'].shape)
         need_load = False
 
         for task in active_tasks:
@@ -55,6 +54,8 @@ class MamlModel(BasicModel):
             if need_load:
                 self.load_state_dict(pre_training_weights)
             need_load = True
+
+            if debug: print(pre_training_weights['fcout.fc5.weight'])
 
             # extract training and meta-training data for task
             train_task_examples = train_task_indices == task

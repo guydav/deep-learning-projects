@@ -171,6 +171,19 @@ class MamlPoolingDropoutCNNMLP(MamlModel, CNNMLPMixIn):
         self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
 
+    def _create_optimizer(self):
+        self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
+                                    weight_decay=self.weight_decay)
+        if self.use_lr_scheduler:
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
+                                                                  factor=0.5,
+                                                                  patience=self.lr_scheduler_patience,
+                                                                  verbose=True)
+
+    def post_test(self, test_loss, epoch):
+        if self.use_lr_scheduler:
+            self.scheduler.step(test_loss)
+
 
 def maml_train_epoch(model, dataloader, cuda=True, device=None,
                      num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):

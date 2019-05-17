@@ -209,19 +209,6 @@ class CNNMLPMixIn:
                                            output_func=fc_output_func,
                                            output_size=output_size)
 
-    def _create_optimizer(self):
-        self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
-                                    weight_decay=self.weight_decay)
-        if self.use_lr_scheduler:
-            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                                  factor=0.5,
-                                                                  patience=self.lr_scheduler_patience,
-                                                                  verbose=True)
-
-    def post_test(self, test_loss, epoch):
-        if self.use_lr_scheduler:
-            self.scheduler.step(test_loss)
-
     def forward(self, img, query=None):
         x = self.conv(img)  ## x = (16 x 24 x 15 x 20)
         """fully connected layers"""
@@ -295,6 +282,19 @@ class PoolingDropoutCNNMLP(BasicModel, CNNMLPMixIn):
         self.weight_decay = weight_decay
         self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
+
+    def _create_optimizer(self):
+        self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
+                                    weight_decay=self.weight_decay)
+        if self.use_lr_scheduler:
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
+                                                                  factor=0.5,
+                                                                  patience=self.lr_scheduler_patience,
+                                                                  verbose=True)
+
+    def post_test(self, test_loss, epoch):
+        if self.use_lr_scheduler:
+            self.scheduler.step(test_loss)
 
 
 class QueryModulatingPoolingDropoutConvInputModel(nn.Module):

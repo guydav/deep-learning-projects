@@ -102,7 +102,7 @@ class MetaLearningH5Dataset(Dataset):
             x = self.transform(x)
 
         if self.return_indices:
-            return (x, y, q, index), index
+            return x, y, q, index
 
         return x, y, q
 
@@ -145,7 +145,7 @@ class MetaLearningH5DatasetFromDescription(MetaLearningH5Dataset):
             x = self.transform(x)
 
         if self.return_indices:
-            return (x, y, q), index
+            return x, y, q, index
 
         return x, y, q
 

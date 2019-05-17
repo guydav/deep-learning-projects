@@ -79,27 +79,26 @@ class MamlModel(BasicModel):
             # task_fast_weights = list(map(lambda p, g: p - self.fast_weight_lr * g, self.parameters(), task_grad))
 
             # meta-train on task
-            with torch.no_grad():
-                # meta_train_model_state = meta_train_model_copy.state_dict()
-                # param_names = meta_train_model_state.keys()
-                # for name, fast_weight in zip(param_names, task_fast_weights):
-                #     meta_train_model_state[name] = fast_weight
-                #
-                # meta_train_model_copy.load_state_dict(meta_train_model_state)
+            # meta_train_model_state = meta_train_model_copy.state_dict()
+            # param_names = meta_train_model_state.keys()
+            # for name, fast_weight in zip(param_names, task_fast_weights):
+            #     meta_train_model_state[name] = fast_weight
+            #
+            # meta_train_model_copy.load_state_dict(meta_train_model_state)
 
-                # meta_task_output = meta_train_model_copy(X_meta_train_task, Q_meta_train_task)
-                # meta_task_loss = meta_train_model_copy.loss(meta_task_output, y_meta_train_task)
-                # meta_objective_losses.append(meta_task_loss)
+            # meta_task_output = meta_train_model_copy(X_meta_train_task, Q_meta_train_task)
+            # meta_task_loss = meta_train_model_copy.loss(meta_task_output, y_meta_train_task)
+            # meta_objective_losses.append(meta_task_loss)
 
-                meta_task_output = self(X_meta_train_task, Q_meta_train_task)
-                meta_task_loss = self.loss(meta_task_output, y_meta_train_task)
-                meta_objective_loss += meta_task_loss
+            meta_task_output = self(X_meta_train_task, Q_meta_train_task)
+            meta_task_loss = self.loss(meta_task_output, y_meta_train_task)
+            meta_objective_loss += meta_task_loss
 
-                meta_task_pred = meta_task_output.data.max(1)[1]
-                meta_train_preds_for_auc.append(meta_task_pred.data.cpu().numpy())
-                meta_task_correct = meta_task_pred.eq(y_meta_train_task.data).cpu()
-                meta_train_correct.append(meta_task_correct.numpy())
-                meta_train_labels_for_auc.append(y_meta_train_task.data.cpu().numpy())
+            meta_task_pred = meta_task_output.data.max(1)[1]
+            meta_train_preds_for_auc.append(meta_task_pred.data.cpu().numpy())
+            meta_task_correct = meta_task_pred.eq(y_meta_train_task.data).cpu()
+            meta_train_correct.append(meta_task_correct.numpy())
+            meta_train_labels_for_auc.append(y_meta_train_task.data.cpu().numpy())
 
         self.load_state_dict(pre_training_weights)
         meta_loss = meta_objective_loss / len(active_tasks)
@@ -107,16 +106,17 @@ class MamlModel(BasicModel):
         meta_loss.backward()
         self.optimizer.step()
 
-        meta_train_accuracy = np.array(meta_train_correct).flatten().mean() * 100
+        with torch.no_grad():
+            meta_train_accuracy = np.array(meta_train_correct).flatten().mean() * 100
 
-        try:
-            all_meta_train_labels = np.array(meta_train_labels_for_auc).flatten()
-            all_meta_train_preds = np.array(meta_train_preds_for_auc).flatten()
-            auc = roc_auc_score(all_meta_train_labels, all_meta_train_preds)
-        except ValueError:
-            auc = None
+            try:
+                all_meta_train_labels = np.array(meta_train_labels_for_auc).flatten()
+                all_meta_train_preds = np.array(meta_train_preds_for_auc).flatten()
+                auc = roc_auc_score(all_meta_train_labels, all_meta_train_preds)
+            except ValueError:
+                auc = None
 
-        per_query_results = {task: list(correct) for task, correct in zip(active_tasks, meta_train_correct)}
+            per_query_results = {task: list(correct) for task, correct in zip(active_tasks, meta_train_correct)}
 
         return dict(accuracy=meta_train_accuracy, loss=meta_loss.item(),
                     auc=auc, per_query_results=per_query_results)

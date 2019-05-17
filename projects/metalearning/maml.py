@@ -172,7 +172,7 @@ class MamlPoolingDropoutCNNMLP(CNNMLPMixIn, MamlModel):
 
 
 def maml_train_epoch(model, dataloader, cuda=True, device=None,
-                     num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
+                     num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT, debug=False):
 
     epoch_results = defaultdict(list)
     epoch_results['per_query_results'] = defaultdict(list)
@@ -185,7 +185,8 @@ def maml_train_epoch(model, dataloader, cuda=True, device=None,
         X_meta_train, Q_meta_train, y_meta_train = split_batch(meta_train_batch, cuda, device, model)
 
         results = model.maml_train_(X_train, Q_train, y_train, X_meta_train, Q_meta_train, y_meta_train,
-                                    dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1])
+                                    dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1],
+                                    debug=debug)
 
         epoch_results['accuracies'].append(results['accuracy'])
         epoch_results['losses'].append(results['loss'])

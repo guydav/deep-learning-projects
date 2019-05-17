@@ -51,7 +51,7 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         test_dataloader.dataset.start_epoch(debug)
         print(f'At epoch #{epoch}, len(train) = {len(train_dataloader.dataset)}, len(test) = {len(test_dataloader.dataset)}')
 
-        train_results = train_epoch_func(model, train_dataloader, cuda, device)
+        train_results = train_epoch_func(model, train_dataloader, cuda, device, debug=debug)
         print_status(model, epoch, 'TRAIN', train_results)
 
         if save:

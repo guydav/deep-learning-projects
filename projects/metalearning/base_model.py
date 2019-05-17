@@ -304,7 +304,7 @@ def now():
 
 
 def train_epoch(model, dataloader, cuda=True, device=None,
-                num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT):
+                num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT, debug=False):
     """
     Train a model through an entire epoch, aggregating results.
     :param model: The model being trained

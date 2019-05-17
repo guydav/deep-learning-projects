@@ -223,8 +223,21 @@ class CNNMLPMixIn:
 
         return self.fcout(x_)
 
+    def _create_optimizer(self):
+        self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
+                                    weight_decay=self.weight_decay)
+        if self.use_lr_scheduler:
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
+                                                                  factor=0.5,
+                                                                  patience=self.lr_scheduler_patience,
+                                                                  verbose=True)
 
-class PoolingDropoutCNNMLP(BasicModel, CNNMLPMixIn):
+    def post_test(self, test_loss, epoch):
+        if self.use_lr_scheduler:
+            self.scheduler.step(test_loss)
+
+
+class PoolingDropoutCNNMLP(CNNMLPMixIn, BasicModel):
     """
     A full model combining the more advanced versions of the convolutional input module (with pooling and dropout
     support) and fully-connected module (with dropout support). Also adding a learning rate scheduler, support for
@@ -257,11 +270,12 @@ class PoolingDropoutCNNMLP(BasicModel, CNNMLPMixIn):
         :param name: Which name to save checkpoints under
         :param save_dir: Which directory to save checkpoints to
         """
-        super(PoolingDropoutCNNMLP, self).__init__(name=name, save_dir=save_dir, num_classes=num_classes,
-                                                   use_mse=use_mse, loss=loss,
-                                                   use_query=query_length != 0,
-                                                   compute_correct_rank=compute_correct_rank)
         CNNMLPMixIn.__init__(self)
+        BasicModel.__init__(self, name=name, save_dir=save_dir, num_classes=num_classes,
+                            use_mse=use_mse, loss=loss,
+                            use_query=query_length != 0,
+                            compute_correct_rank=compute_correct_rank)
+
         
         self.query_length = query_length
         self.conv = self._create_conv_module(conv_filter_sizes, conv_dropout, conv_p_dropout)
@@ -283,18 +297,6 @@ class PoolingDropoutCNNMLP(BasicModel, CNNMLPMixIn):
         self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
 
-    def _create_optimizer(self):
-        self.optimizer = optim.Adam(self.parameters(), lr=self.lr,
-                                    weight_decay=self.weight_decay)
-        if self.use_lr_scheduler:
-            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                                  factor=0.5,
-                                                                  patience=self.lr_scheduler_patience,
-                                                                  verbose=True)
-
-    def post_test(self, test_loss, epoch):
-        if self.use_lr_scheduler:
-            self.scheduler.step(test_loss)
 
 
 class QueryModulatingPoolingDropoutConvInputModel(nn.Module):

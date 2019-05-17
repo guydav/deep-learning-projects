@@ -2,7 +2,6 @@ from .base_model import *
 from .cnnmlp import *
 
 import torch
-from torch import autograd
 
 import copy
 
@@ -107,11 +106,11 @@ class MamlModel(BasicModel):
         self.optimizer.step()
 
         with torch.no_grad():
-            meta_train_accuracy = np.array(meta_train_correct).flatten().mean() * 100
+            meta_train_accuracy = np.concatenate(meta_train_correct).ravel().mean() * 100
 
             try:
-                all_meta_train_labels = np.array(meta_train_labels_for_auc).flatten()
-                all_meta_train_preds = np.array(meta_train_preds_for_auc).flatten()
+                all_meta_train_labels = np.concatenate(meta_train_labels_for_auc).ravel()
+                all_meta_train_preds = np.concatenate(meta_train_preds_for_auc).ravel()
                 auc = roc_auc_score(all_meta_train_labels, all_meta_train_preds)
             except ValueError:
                 auc = None
@@ -186,8 +185,7 @@ def maml_train_epoch(model, dataloader, cuda=True, device=None,
         X_meta_train, Q_meta_train, y_meta_train = split_batch(meta_train_batch, cuda, device, model)
 
         results = model.maml_train_(X_train, Q_train, y_train, X_meta_train, Q_meta_train, y_meta_train,
-                                    dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1],
-                                    debug=True)
+                                    dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1])
 
         epoch_results['accuracies'].append(results['accuracy'])
         epoch_results['losses'].append(results['loss'])
@@ -212,7 +210,9 @@ def maml_train_epoch(model, dataloader, cuda=True, device=None,
 
 def split_batch(batch, cuda, device, model):
     if model.use_query:
-        X, y, Q = batch
+        X, y, Q, index = batch
+        print(index[:10])
+        print(index[-10:])
 
     else:
         X, y = batch

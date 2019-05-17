@@ -63,7 +63,7 @@ DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 parser.add_argument('--maml', action='store_true')
-DEFAULT_FAST_WEIGHT_LEARNING_RATE = 2.5e-4
+DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
 parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
 
 parser.add_argument('--debug', action='store_true')

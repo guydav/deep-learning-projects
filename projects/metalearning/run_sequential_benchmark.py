@@ -186,7 +186,7 @@ if __name__ == '__main__':
     model.load_model(current_epoch)
     model = model.cuda()
 
-    if args.debug: print('After model.cuda()')
+    if args.debug: print(f'After model.cuda(), wandb project is {args.wandb_project}')
 
     # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
     # os.environ['WANDB_RESUME'] = 'must'

@@ -531,7 +531,7 @@ class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescripti
 
         self.sub_epochs = [list(zip(sub_epoch,
                                     itertools.cycle([self.query_order[self.current_query_index]])))
-                           for sub_epoch in sub_epochs_without_task]reusme
+                           for sub_epoch in sub_epochs_without_task]
 
     def _compute_indices(self, index):
         return self.sub_epochs[self.sub_epoch_index][index]

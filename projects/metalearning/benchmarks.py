@@ -97,7 +97,7 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test_dataloader,
                           accuracy_threshold=DEFAULT_ACCURACY_THRESHOLD,
                           num_epochs=1000, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
-                          watch=True, save_name='model', start_task=2):
+                          watch=True, save_name='model', start_task=2, per_task_epoch_limit=1000):
     """
     Execute the sequential benchmark as described in the paper.
     :param model: Which model to train and test according to the benchmark
@@ -150,6 +150,8 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
 
     test_dataloader.dataset.next_query()  # we need to make sure the next query us active from the first moment
 
+    current_task_start_epoch = start_epoch
+
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         train_dataloader.dataset.start_epoch()
         test_dataloader.dataset.start_epoch()
@@ -174,11 +176,17 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
         wandb.log(log_results)
 
         criterion_met = log_results['Test Per-Query Accuracy (list)'][current_query_index] > accuracy_threshold
+        out_of_epochs = (epoch - current_task_start_epoch) > per_task_epoch_limit
 
-        print(epoch, current_query_index, log_results['Test Per-Query Accuracy (list)'], criterion_met)
+        print(epoch, current_query_index, log_results['Test Per-Query Accuracy (list)'], criterion_met, out_of_epochs)
 
-        if criterion_met:
-            print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({query_order[current_query_index]}), moving to the next query')
+        if criterion_met or out_of_epochs:
+            if criterion_met:
+                print(f'On epoch #{epoch}, reached criterion on query #{current_query_index} ({query_order[current_query_index]}), moving to the next query')
+
+            if out_of_epochs:
+                print(
+                    f'On epoch #{epoch}, reached {per_task_epoch_limit} from the previous task start ({current_task_start_epoch}), moving to the next query')
             train_dataloader.dataset.next_query()
             test_dataloader.dataset.next_query()
 
@@ -194,6 +202,8 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
             print_status(model, epoch, f'PRE-TASK {current_query_index + 1}', test_results)
             log_results = create_log_results_dict(current_query_index, query_order, total_training_size, test_results)
             wandb.log(log_results)
+
+            current_task_start_epoch = epoch
 
         if epoch % epochs_to_graph == 0:
             mid_train_plot(model, 1)

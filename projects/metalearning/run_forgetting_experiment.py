@@ -42,6 +42,9 @@ parser.add_argument('--checkpoint_file_pattern', type=str, default=CHECKPOINT_FI
 DEFAULT_TRAIN_SUB_EPOCH_SIZE = 1500  # 4500
 parser.add_argument('--train_sub_epoch_size', type=int, default=DEFAULT_TRAIN_SUB_EPOCH_SIZE)
 
+DEFAULT_PER_TASK_EPOCH_LIMIT = 1000
+parser.add_argument('--per_task_epoch_limit', type=int, default=DEFAULT_PER_TASK_EPOCH_LIMIT)
+
 ##### verified up to there
 
 DEFAULT_TEST_CORESET_SIZE = 5000
@@ -246,4 +249,4 @@ if __name__ == '__main__':
                           epochs_to_graph=total_epochs + 1,
                           start_epoch=current_epoch,
                           save_name=f'{args.name}-{dataset_random_seed}',
-                          start_task=last_task_started)
+                          start_task=last_task_started, per_task_epoch_limit=args.per_task_epoch_limit)

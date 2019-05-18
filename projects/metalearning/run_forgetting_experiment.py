@@ -187,7 +187,7 @@ if __name__ == '__main__':
 
     wandb.init(entity='meta-learning-scaling', project=args.wandb_project, id=new_run_id)
 
-    if args.reusme:
+    if args.resume:
         resumed_hist = resumed_wandb_run.history(samples=2000)
         tasks_started = [f'Test Accuracy, Query #{task}' in resumed_hist for task in range(2, 11)]
         # Adding two because we start from training on task 2

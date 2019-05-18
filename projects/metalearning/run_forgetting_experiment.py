@@ -1,7 +1,7 @@
 import sys
 import torch
-import wandb
 import json
+import os
 
 sys.path.extend(('/home/cc/deep-learning-projects', '/home/cc/src/tqdm'))
 
@@ -28,6 +28,13 @@ parser.add_argument('--run_id_line_number', type=int)
 RUN_PATTERN = 'meta-learning-scaling/sequential-benchmark-baseline/{run_id}'
 parser.add_argument('--run_path_pattern', type=str, default=RUN_PATTERN)
 
+parser.add_argument('--resume', action='store_true')
+RESUME_RUN_ID_FILE = './forgetting_run_ids_to_resume.txt'
+parser.add_argument('--resume_run_id_file_path', type=str, default=RESUME_RUN_ID_FILE)
+
+RESUME_RUN_PATTERN = 'meta-learning-scaling/sequential-benchmark-forgetting-experiment-revisited/{run_id}'
+parser.add_argument('--resume_run_path_pattern', type=str, default=RESUME_RUN_PATTERN)
+
 CHECKPOINT_FILE_PATTERN = 'Baseline-{seed}-query-{{query}}.pth'
 parser.add_argument('--checkpoint_file_pattern', type=str, default=CHECKPOINT_FILE_PATTERN)
 
@@ -35,7 +42,6 @@ DEFAULT_TRAIN_SUB_EPOCH_SIZE = 1500  # 4500
 parser.add_argument('--train_sub_epoch_size', type=int, default=DEFAULT_TRAIN_SUB_EPOCH_SIZE)
 
 ##### verified up to there
-
 
 DEFAULT_TEST_CORESET_SIZE = 5000
 parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
@@ -52,7 +58,7 @@ parser.add_argument('--name')
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
-DEFAULT_MAX_EPOCHS = 1000
+DEFAULT_MAX_EPOCHS = 3000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 
 DEFAULT_WANDB_PROJECT = 'sequential-benchmark-forgetting-experiment-revisited' # 'sequential-benchmark-forgetting-experiment'
@@ -69,22 +75,45 @@ if __name__ == '__main__':
     num_workers = args.num_workers
     pin_memory = bool(args.pin_memory)
 
+    if args.resume:
+        with open(args.resume_run_id_file_path, 'r') as resume_run_id_file:
+            resume_run_ids = resume_run_id_file.readlines()
+            resume_run_id = resume_run_ids[args.run_id_line_number].strip()
+
+        os.environ['WANDB_RESUME'] = 'must'
+        os.environ['WANDB_RUN_ID'] = resume_run_id
+
+    # importing here to handle environment variables before
+    import wandb
+
     if num_workers > 1:
         try:
             torch.multiprocessing.set_start_method("spawn")
         except RuntimeError:
             pass
 
-    with open(args.run_id_file_path, 'r') as run_id_file:
-        run_ids = run_id_file.readlines()
-        run_id = run_ids[args.run_id_line_number].strip()
-
-    print(f'For line {args.run_id_line_number} the id is {run_id}')
-
     wandb_api = wandb.Api()
-    wandb_run = wandb_api.run(args.run_path_pattern.format(run_id=run_id))
-    run_config = json.loads(wandb_run.json_config)
 
+    if args.resume:
+        print(f'RESUMING: for line {args.run_id_line_number} the id is {resume_run_id}')
+
+        resumed_wandb_run = wandb_api.run(args.resume_run_path_pattern.format(run_id=resume_run_id))
+        resumed_run_config = json.loads(resumed_wandb_run.json_config)
+        run_id = resumed_run_config['original_run_id']['value']
+
+        wandb_run = wandb_api.run(args.run_path_pattern.format(run_id=run_id))
+        run_config = json.loads(wandb_run.json_config)
+
+    else:
+        with open(args.run_id_file_path, 'r') as run_id_file:
+            run_ids = run_id_file.readlines()
+            run_id = run_ids[args.run_id_line_number].strip()
+
+        print(f'For line {args.run_id_line_number} the id is {run_id}')
+
+        wandb_run = wandb_api.run(args.run_path_pattern.format(run_id=run_id))
+
+    run_config = json.loads(wandb_run.json_config)
     dataset_random_seed = run_config['dataset_random_seed']['value']
     benchmark_dimension = run_config['benchmark_dimension']['value']
     if not isinstance(benchmark_dimension, int):
@@ -154,35 +183,58 @@ if __name__ == '__main__':
 
     sequential_benchmark_test_model = sequential_benchmark_test_model.cuda()
 
-    wandb.init(entity='meta-learning-scaling', project=args.wandb_project)
+    new_run_id = args.resume and resume_run_id or None
 
-    description = args.description
-    if len(description) > 0:
-        description += '\n'
+    wandb.init(entity='meta-learning-scaling', project=args.wandb_project, id=new_run_id)
 
-    description += f'{args.name}-{dataset_random_seed}\nsub-epoch size: {train_sub_epoch_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}'
-    wandb.run.description = description
-    wandb.run.save()
+    if args.reusme:
+        resumed_hist = resumed_wandb_run.history(samples=2000)
+        tasks_started = [f'Test Accuracy, Query #{task}' in resumed_hist for task in range(2, 11)]
+        # Adding two because we start from training on task 2
+        last_task_started = len(tasks_started) - 1 - tasks_started[::-1].index(True) + 2
+        # Removing one to account for the pre-epoch test
+        step_resumed_from = resumed_hist[f'Test Accuracy, Query #{last_task_started}'].first_valid_index() - 1
 
-    current_model = sequential_benchmark_test_model
+        description = wandb.run.description
+        description += f'\nResumed from step {step_resumed_from}'
 
-    wandb.config.lr = current_model.lr
-    wandb.config.decay = current_model.weight_decay
-    wandb.config.loss = 'CE'
-    wandb.config.batch_size = train_dataloader.batch_size
-    wandb.config.benchmark_dimension = benchmark_dimension
-    wandb.config.dataset_random_seed = dataset_random_seed
-    wandb.config.train_sub_epoch_size = train_sub_epoch_size
-    wandb.config.test_coreset_size = test_coreset_size
-    wandb.config.query_order = [int(x) for x in query_order]
-    wandb.config.accuracy_threshold = accuracy_threshold
-    wandb.config.epochs = total_epochs
-    wandb.config.run_id_line_number = args.run_id_line_number
-    wandb.config.original_run_id = run_id
+        wandb.config.step_resumed_from = step_resumed_from
+
+        wandb.run.save()
+
+        start_task = last_task_started
+
+    else:
+        description = args.description
+        if len(description) > 0:
+            description += '\n'
+
+        description += f'{args.name}-{dataset_random_seed}\nsub-epoch size: {train_sub_epoch_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}'
+        wandb.run.description = description
+        wandb.run.save()
+
+        current_model = sequential_benchmark_test_model
+
+        wandb.config.lr = current_model.lr
+        wandb.config.decay = current_model.weight_decay
+        wandb.config.loss = 'CE'
+        wandb.config.batch_size = train_dataloader.batch_size
+        wandb.config.benchmark_dimension = benchmark_dimension
+        wandb.config.dataset_random_seed = dataset_random_seed
+        wandb.config.train_sub_epoch_size = train_sub_epoch_size
+        wandb.config.test_coreset_size = test_coreset_size
+        wandb.config.query_order = [int(x) for x in query_order]
+        wandb.config.accuracy_threshold = accuracy_threshold
+        wandb.config.epochs = total_epochs
+        wandb.config.run_id_line_number = args.run_id_line_number
+        wandb.config.original_run_id = run_id
+
+        start_task = 2
 
     forgetting_experiment(sequential_benchmark_test_model, checkpoint_file_pattern,
                           train_dataloader, test_dataloader, accuracy_threshold,
-                         num_epochs=total_epochs - current_epoch,
-                         epochs_to_graph=total_epochs + 1,
-                         start_epoch=current_epoch,
-                         save_name=f'{args.name}-{dataset_random_seed}')
+                          num_epochs=total_epochs - current_epoch,
+                          epochs_to_graph=total_epochs + 1,
+                          start_epoch=current_epoch,
+                          save_name=f'{args.name}-{dataset_random_seed}',
+                          start_task=last_task_started)

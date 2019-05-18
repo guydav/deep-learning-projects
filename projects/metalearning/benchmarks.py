@@ -97,7 +97,7 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
 def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test_dataloader,
                           accuracy_threshold=DEFAULT_ACCURACY_THRESHOLD,
                           num_epochs=1000, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
-                          watch=True, save_name='model'):
+                          watch=True, save_name='model', start_task=2):
     """
     Execute the sequential benchmark as described in the paper.
     :param model: Which model to train and test according to the benchmark
@@ -133,16 +133,22 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
     query_order = train_dataloader.dataset.query_order
     print(f'Working in query order {query_order}, starting from query #1 ({query_order[1]})')
 
+    for skipped_task in range(2, start_task):
+        train_dataloader.dataset.next_query()
+        test_dataloader.dataset.next_query()
+
     print('Loading checkpoint for end of previous query')
-    model.load_state(checkpoint_file_pattern.format(query=0))
+    # Subtracting 2: 1 for zero-based vs. one-based, one because we want to load at the end of the previous task
+    model.load_state(checkpoint_file_pattern.format(query=start_task - 2))
 
     # Test the model to get a baseline for the forgetting curves
     test_results = test(model, test_dataloader, cuda, device, True)
-    print_status(model, 0, f'PRE-TASK 1', test_results)
-    log_results = create_log_results_dict(0, query_order, total_training_size, test_results)
+    print_status(model, 0, f'PRE-TASK {start_task - 1}', test_results)
+    log_results = create_log_results_dict(train_dataloader.dataset.current_query_index,
+                                          query_order, total_training_size, test_results)
     wandb.log(log_results)
 
-    test_dataloader.dataset.next_query()  # we need to make sure two queries are active from the first moment
+    test_dataloader.dataset.next_query()  # we need to make sure the next query us active from the first moment
 
     for epoch in range(start_epoch + 1, start_epoch + num_epochs + 1):
         train_dataloader.dataset.start_epoch()

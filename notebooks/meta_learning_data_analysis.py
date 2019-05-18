@@ -222,6 +222,47 @@ def parse_run_results_with_new_task_accuracy_and_equal_size(current_run_id=None,
     return examples_to_criterion, absolute_accuracy, absolute_accuracy_equal_size, first_task_accuracy_by_epoch, new_task_accuracy_by_epoch
 
 
+def parse_forgetting_results(current_run_id=None, current_run=None, samples=2000):
+    if current_run_id is None and current_run is None:
+        print('Must provide either a current run or its id')
+        return
+    
+    if current_run is None:
+        current_run = API.run(f'meta-learning-scaling/sequential-benchmark-forgetting-experiment-revisited/{current_run_id}')
+        
+    print(f'Starting to parse run {current_run.name}')
+    current_df = current_run.history(pandas=True, samples=samples)
+    
+    forgetting_trjectories = np.empty((10, 10, 1000))
+    forgetting_trjectories.fill(np.nan)
+    
+    for new_task in range(2, 11):
+        forgetting_start = current_df[f'Test Accuracy, Query #{new_task}'].first_valid_index() - 1
+        
+        if new_task == 10:
+            forgetting_end = len(current_df) - 1
+        else:
+            forgetting_end = current_df[f'Test Accuracy, Query #{new_task + 1}'].first_valid_index() - 1 
+            
+        forgetting_len = forgetting_end - forgetting_start
+    
+        for forgetting_task in range(1, new_task):
+            number_times_learned = new_task - forgetting_task
+            number_total_tasks = new_task
+            trajectory = current_df[f'Test Accuracy, Query #{forgetting_task}'][forgetting_start:forgetting_end]
+            
+            if np.any(np.isnan(trajectory)):
+                print(f'Found nans for new task {new_task} and forgetting task {forgetting_task}')
+                print(forgetting_start, forgetting_end)
+                print(trajectory)
+            
+            forgetting_trjectories[number_times_learned - 1, number_total_tasks - 1, :forgetting_len] = trajectory
+                
+    
+    return forgetting_trjectories
+    
+
+
 PRINT_HEADERS = ['###'] + [str(x) for x in range(1, 11)]
 
 

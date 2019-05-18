@@ -2,6 +2,7 @@ import sys
 import torch
 import json
 import os
+import yaml
 
 sys.path.extend(('/home/cc/deep-learning-projects', '/home/cc/src/tqdm'))
 
@@ -99,6 +100,13 @@ if __name__ == '__main__':
 
         resumed_wandb_run = wandb_api.run(args.resume_run_path_pattern.format(run_id=resume_run_id))
         resumed_run_config = json.loads(resumed_wandb_run.json_config)
+
+        if 'original_run_id' not in resumed_run_config:
+            cfg_yaml_file = resumed_wandb_run.file('config.yaml')
+            cfg_file = cfg_yaml_file.download(replace=True)
+            raw_cfg = cfg_file.read()
+            resumed_run_config = yaml.load(raw_cfg)
+
         run_id = resumed_run_config['original_run_id']['value']
 
         wandb_run = wandb_api.run(args.run_path_pattern.format(run_id=run_id))

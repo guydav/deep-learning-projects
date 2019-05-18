@@ -203,6 +203,7 @@ if __name__ == '__main__':
         wandb.run.save()
 
         start_task = last_task_started
+        print(f'Resuming from task {start_task}')
 
     else:
         description = args.description

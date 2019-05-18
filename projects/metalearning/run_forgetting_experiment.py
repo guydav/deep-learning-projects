@@ -197,7 +197,6 @@ if __name__ == '__main__':
 
     if args.resume:
         resumed_hist = resumed_wandb_run.history(samples=2000)
-        print(resumed_hist.shape)
         tasks_started = [f'Test Accuracy, Query #{task}' in resumed_hist for task in range(2, 11)]
         # Adding two because we start from training on task 2
         last_task_started = len(tasks_started) - 1 - tasks_started[::-1].index(True) + 2
@@ -207,7 +206,7 @@ if __name__ == '__main__':
         description = wandb.run.description
         description += f'\nResumed from step {step_resumed_from}'
 
-        wandb.config.step_resumed_from = step_resumed_from
+        wandb.config.step_resumed_from = int(step_resumed_from)
 
         wandb.run.save()
 

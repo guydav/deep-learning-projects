@@ -92,8 +92,9 @@ class MamlModel(BasicModel):
             # meta_objective_losses.append(meta_task_loss)
 
             meta_task_output = self(X_meta_train_task, Q_meta_train_task)
+            # on the meta-objective, sum, rather than average
             meta_task_loss = self.loss(meta_task_output, y_meta_train_task)
-            meta_objective_loss += meta_task_loss
+            meta_objective_loss += meta_task_loss * X_meta_train_task.shape[0]
 
             meta_task_pred = meta_task_output.data.max(1)[1]
             meta_train_preds_for_auc.append(meta_task_pred.data.cpu().numpy())
@@ -102,7 +103,7 @@ class MamlModel(BasicModel):
             meta_train_labels_for_auc.append(y_meta_train_task.data.cpu().numpy())
 
         self.load_state_dict(pre_training_weights)
-        meta_loss = meta_objective_loss / len(active_tasks)
+        meta_loss = meta_objective_loss / (len(active_tasks) * X_meta_train.shape[0])
         self.optimizer.zero_grad()
         meta_loss.backward()
         self.optimizer.step()
@@ -171,6 +172,7 @@ class MamlPoolingDropoutCNNMLP(CNNMLPMixIn, MamlModel):
         self.weight_decay = weight_decay
         self.use_lr_scheduler = use_lr_scheduler
         self.lr_scheduler_patience = lr_scheduler_patience
+
 
 
 def maml_train_epoch(model, dataloader, cuda=True, device=None,

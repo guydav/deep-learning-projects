@@ -103,7 +103,7 @@ class MamlModel(BasicModel):
             meta_train_labels_for_auc.append(y_meta_train_task.data.cpu().numpy())
 
         self.load_state_dict(pre_training_weights)
-        meta_loss = meta_objective_loss / (len(active_tasks) * X_meta_train.shape[0])
+        meta_loss = meta_objective_loss / X_meta_train.shape[0]
         self.optimizer.zero_grad()
         meta_loss.backward()
         self.optimizer.step()

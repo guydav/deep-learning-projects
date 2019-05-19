@@ -33,6 +33,8 @@ parser.add_argument('--resume', action='store_true')
 RESUME_RUN_ID_FILE = './forgetting_run_ids_to_resume.txt'
 parser.add_argument('--resume_run_id_file_path', type=str, default=RESUME_RUN_ID_FILE)
 
+parser.add_argument('--fix_resume_pre_test', action='store_true')
+
 RESUME_RUN_PATTERN = 'meta-learning-scaling/sequential-benchmark-forgetting-experiment-revisited/{run_id}'
 parser.add_argument('--resume_run_path_pattern', type=str, default=RESUME_RUN_PATTERN)
 
@@ -78,6 +80,9 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     num_workers = args.num_workers
     pin_memory = bool(args.pin_memory)
+
+    if args.fix_resume_pre_test:
+        args.resume = True
 
     if args.resume:
         with open(args.resume_run_id_file_path, 'r') as resume_run_id_file:
@@ -194,8 +199,23 @@ if __name__ == '__main__':
 
     sequential_benchmark_test_model = sequential_benchmark_test_model.cuda()
 
-    new_run_id = args.resume and resume_run_id or None
+    if args.fix_resume_pre_test:
+        resumed_hist = resumed_wandb_run.history(samples=2000)
+        step_resumed_from = resumed_run_config['step_resumed_from']
+        resumed_row = resumed_hist[step_resumed_from:step_resumed_from + 1]
+        tasks_active = [not resumed_row[f'Test Accuracy, Query #{i}'].isna().bool() for i in range(1, 11)]
+        task_to_pre_test = len(tasks_active) - 1 - tasks_active[::-1].index(True) + 2
 
+        fixed_pre_test = forgetting_experiment_resume_pre_test_fix(
+            sequential_benchmark_test_model, checkpoint_file_pattern, test_dataloader,
+            task_to_pre_test)
+
+        print(f'For testing before task #{task_to_pre_test}, updating the results to {fixed_pre_test}')
+        resumed_wandb_run.config['fixed_resume_pre_test'] = fixed_pre_test
+        resumed_wandb_run.update()
+        sys.exit(0)
+
+    new_run_id = args.resume and resume_run_id or None
     wandb.init(entity='meta-learning-scaling', project=args.wandb_project, id=new_run_id)
 
     if args.resume:

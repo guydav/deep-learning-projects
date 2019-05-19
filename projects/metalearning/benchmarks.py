@@ -137,6 +137,9 @@ def forgetting_experiment(model, checkpoint_file_pattern, train_dataloader, test
         train_dataloader.dataset.next_query()
         test_dataloader.dataset.next_query()
 
+    # Bug-fix -- forgot to do this previously
+    test_dataloader.dataset.start_epoch()
+
     print('Loading checkpoint for end of previous query')
     # Subtracting 2: 1 for zero-based vs. one-based, one because we want to load at the end of the previous task
     model.load_state(checkpoint_file_pattern.format(query=start_task - 2))
@@ -251,5 +254,27 @@ def epoch_results_to_log_dict(query_order, current_query_index, epoch_results, n
 
     return log_dict
 
+
+def forgetting_experiment_resume_pre_test_fix(model, checkpoint_file_pattern, test_dataloader,
+                                              task_to_pre_test=2, cuda=True):
+    device = None
+    if cuda:
+        device = next(model.parameters()).device
+
+    query_order = test_dataloader.dataset.query_order
+    print(f'Working in query order {query_order}, starting from query #1 ({query_order[1]})')
+
+    for skipped_task in range(2, task_to_pre_test):
+        test_dataloader.dataset.next_query()
+
+    test_dataloader.start_epoch()
+
+    print('Loading checkpoint for end of previous query')
+    # Subtracting 2: 1 for zero-based vs. one-based, one because we want to load at the end of the previous task
+    model.load_state(checkpoint_file_pattern.format(query=task_to_pre_test - 2))
+
+    # Test the model to get a baseline for the forgetting curves
+    test_results = test(model, test_dataloader, cuda, device, True)
+    return test_results['Test Per-Query Accuracy (list)']
 
 

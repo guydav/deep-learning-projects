@@ -222,7 +222,8 @@ def parse_run_results_with_new_task_accuracy_and_equal_size(current_run_id=None,
     return examples_to_criterion, absolute_accuracy, absolute_accuracy_equal_size, first_task_accuracy_by_epoch, new_task_accuracy_by_epoch
 
 
-def parse_forgetting_results(current_run_id=None, current_run=None, samples=2000):
+def parse_forgetting_results(current_run_id=None, current_run=None, samples=2000, 
+                             max_samples_per_curve=31):
     if current_run_id is None and current_run is None:
         print('Must provide either a current run or its id')
         return
@@ -231,10 +232,19 @@ def parse_forgetting_results(current_run_id=None, current_run=None, samples=2000
         current_run = API.run(f'meta-learning-scaling/sequential-benchmark-forgetting-experiment-revisited/{current_run_id}')
         
     print(f'Starting to parse run {current_run.name}')
-    current_df = current_run.history(pandas=True, samples=samples)
+    raw_df = current_run.history(pandas=True, samples=samples)
     
-    forgetting_trjectories = np.empty((10, 10, 1000))
+    forgetting_trjectories = np.empty((10, 10, max_samples_per_curve))
     forgetting_trjectories.fill(np.nan)
+    
+    if 'step_resumed_from' in current_run.config:
+        step_resumed_from = current_run.config['step_resumed_from']
+        post_resume_step = raw_df[900:1100]['_timestamp'].diff().idxmax()
+        current_df = raw_df.drop(range(step_resumed_from + 1, post_resume_step + 1), axis=0, inplace=False)
+        current_df.reset_index(inplace=True)
+        
+    else:
+        current_df = raw_df 
     
     for new_task in range(2, 11):
         forgetting_start = current_df[f'Test Accuracy, Query #{new_task}'].first_valid_index() - 1
@@ -244,13 +254,13 @@ def parse_forgetting_results(current_run_id=None, current_run=None, samples=2000
         else:
             forgetting_end = current_df[f'Test Accuracy, Query #{new_task + 1}'].first_valid_index() - 1 
             
-        forgetting_len = forgetting_end - forgetting_start
+        forgetting_len = min(forgetting_end - forgetting_start, max_samples_per_curve)
     
         for forgetting_task in range(1, new_task):
             number_times_learned = new_task - forgetting_task
             number_total_tasks = new_task
-            trajectory = current_df[f'Test Accuracy, Query #{forgetting_task}'][forgetting_start:forgetting_end]
-            
+            trajectory = np.array(current_df[f'Test Accuracy, Query #{forgetting_task}'][forgetting_start:forgetting_start + forgetting_len], dtype=np.float64)
+
             if np.any(np.isnan(trajectory)):
                 print(f'Found nans for new task {new_task} and forgetting task {forgetting_task}')
                 print(forgetting_start, forgetting_end)

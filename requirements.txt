@@ -1,5 +1,6 @@
 matplotlib
 numpy
+pandas
 Pillow==4.0.0
 pyro-ppl
 scipy

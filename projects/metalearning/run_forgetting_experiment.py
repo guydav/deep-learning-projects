@@ -216,7 +216,8 @@ if __name__ == '__main__':
         sys.exit(0)
 
     new_run_id = args.resume and resume_run_id or None
-    wandb.init(entity='meta-learning-scaling', project=args.wandb_project, id=new_run_id)
+    name = (not args.resume) and f'{args.name}-{dataset_random_seed}' or None
+    wandb.init(entity='meta-learning-scaling', project=args.wandb_project, name=name, id=new_run_id)
 
     if args.resume:
         resumed_hist = resumed_wandb_run.history(samples=2000)
@@ -241,7 +242,7 @@ if __name__ == '__main__':
         if len(description) > 0:
             description += '\n'
 
-        description += f'{args.name}-{dataset_random_seed}\nsub-epoch size: {train_sub_epoch_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}'
+        description += f'sub-epoch size: {train_sub_epoch_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}'
         wandb.run.description = description
         wandb.run.save()
 

@@ -362,7 +362,8 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         reg_x_values.extend(x_values)
         y_means = results.mean[task, task:]
         reg_y_values.extend(y_means)
-        y_stds = results.std[task, task:] / (sem_n ** 0.5)
+        if results.std is not None:
+            y_stds = results.std[task, task:] / (sem_n ** 0.5)
         
         linestyle = '-'
         marker = '.'
@@ -558,9 +559,9 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                       plot_regression=plot_regression, regression_legend=regression_legend)
         
         if (ax_index == len(dimension_names) - 1) and add_colorbars:
-            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[3][data_index].mean.shape[0],
+            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
                                  y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
-            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[3][data_index].mean.shape[0],
+            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
                                  y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
 
     if add_subfigure_texts:

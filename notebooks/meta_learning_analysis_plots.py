@@ -212,11 +212,23 @@ def generate_custom_ticks(scale=4000, max_power=8, min_power=0):
 DEFAULT_LOG_SCALE_CUSTOM_TICKS = generate_custom_ticks()  # previously: (4500, 9000, 22500, 45000, 90000, 225000, 450000)
 
 
+def fit_regression_line(x, y, log_x=False, log_y=False, index_increment=1):
+    x = np.array(x)
+    if log_x:
+        x = np.log(x)
+        
+    y = np.array(y)
+    if log_y:
+        y = np.log(y)
+
+    return np.polynomial.polynomial.polyfit(x, y, 1)
+
+
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
                                  title=None, hline_y=None, hline_style=None, 
                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
-                                 text=None, text_x=None, text_y=None):
+                                 text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False):
     if font_dict is None:
         font_dict = {}
         
@@ -227,14 +239,18 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
     means = [results.mean[r, c] for (r, c) in zip(nonzero_rows, nonzero_cols)]
     
-    
     # ax.scatter(nonzero_rows + 1, means, 
     #                              color=[colors(x / num_points) for x 
     #                                     in abs(nonzero_cols - nonzero_rows)])
     
+    reg_x_values = []
+    reg_y_values = []
+    
     for task in range(num_points):
         x_values = np.arange(1, num_points - task + 1)
+        reg_x_values.extend(x_values)
         y_means = np.diag(results.mean, task)
+        reg_y_values.extend(y_means)
         ax.plot(x_values, y_means, marker='.', markersize=12, color=colors(task / num_points))
         
         if shade_error:
@@ -248,6 +264,17 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         
         ax.axhline(hline_y, **hline_style)
         
+    if plot_regression:
+        (intercept, slope) = fit_regression_line(reg_x_values, reg_y_values, log_x=log_x)
+        label = f'{log_y and "log(" or ""}y{log_y and ")" or ""} = {slope:.3} {log_x and "log(" or ""}x{log_x and ")" or ""} + {intercept:.3}'
+        x_reg = np.arange(1, results.mean.shape[0] + 1)
+        if log_x:
+            y_reg = intercept + slope * np.log(x_reg)
+        else:
+            y_reg = intercept + slope * x_reg
+        ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
+        print(label)
+        
     if ylim is not None:
         ax.set_ylim(ylim)
 
@@ -258,27 +285,30 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     
     if log_y:
-#         ax.set_yscale("log", nonposy='clip')
-        y_min, y_max = ax.get_ylim()
-#        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
-#        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
-        
-#        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
-#        y_ticks = np.log(10) * y_powers_10
-#        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+        if log_y == 'simple':
+            ax.set_yscale('log')
+        else:
+    #         ax.set_yscale("log", nonposy='clip')
+            y_min, y_max = ax.get_ylim()
+    #        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
+    #        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
 
-        # Trying y-ticks at fixed intervals
-        # real_y_min = np.exp(y_min)
-        # real_y_max = np.exp(y_max)
-        
-        # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
-        # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
-        
-        real_y_ticks = log_y_custom_ticks
-        y_ticks = np.log(real_y_ticks)
-        
-        ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
+    #        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
+    #        y_ticks = np.log(10) * y_powers_10
+    #        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+
+            # Trying y-ticks at fixed intervals
+            # real_y_min = np.exp(y_min)
+            # real_y_max = np.exp(y_max)
+
+            # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
+            # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
+
+            real_y_ticks = log_y_custom_ticks
+            y_ticks = np.log(real_y_ticks)
+
+            ax.set_yticks(y_ticks)
+            ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
     
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Number of times trained{log_x and ")" or ""}'
@@ -290,10 +320,13 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     
     if y_label_right:
         ax.yaxis.set_label_position("right")
+        
+    if regression_legend:
+        ax.legend(loc='best')
     
     if title is None:
         # title = f'{results.name} vs. number of tasks trained'
-        title = 'Number of times trained on'
+        title = 'Number of times trained on' 
         
     ax.set_title(title, **title_font_dict)
     
@@ -310,7 +343,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
                                   font_dict=None, x_label=None, y_label=None, y_label_right=False, 
                                   title=None, hline_y=None, hline_style=None, highlight_first_time=None,
                                   log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
-                                  text=None, text_x=None, text_y=None):
+                                  text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False):
     if font_dict is None:
         font_dict = {}
         
@@ -320,10 +353,15 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     num_points = results.mean.shape[0]
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
     means = [results.mean[r, c] for (r, c) in zip(nonzero_rows, nonzero_cols)]
+    
+    reg_x_values = []
+    reg_y_values = []
 
     for task in range(num_points):
         x_values = np.arange(task + 1, num_points + 1)
+        reg_x_values.extend(x_values)
         y_means = results.mean[task, task:]
+        reg_y_values.extend(y_means)
         y_stds = results.std[task, task:] / (sem_n ** 0.5)
         
         linestyle = '-'
@@ -355,6 +393,17 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
             hline_style = {}
         
         ax.axhline(hline_y, **hline_style)
+        
+    if plot_regression:
+        (intercept, slope) = fit_regression_line(reg_x_values, reg_y_values, log_x=log_x)
+        label = f'{log_y and "log(" or ""}y{log_y and ")" or ""} = {slope:.3} {log_x and "log(" or ""}x{log_x and ")" or ""} + {intercept:.3}'
+        x_reg = np.arange(1, results.mean.shape[0] + 1)
+        if log_x:
+            y_reg = intercept + slope * np.log(x_reg)
+        else:
+            y_reg = intercept + slope * x_reg
+        ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
+        print(label)
     
     if ylim is not None:
         ax.set_ylim(ylim)
@@ -366,27 +415,30 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
         
     if log_y:
-#         ax.set_yscale("log", nonposy='clip')
-        y_min, y_max = ax.get_ylim()
-#        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
-#        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
-        
-#        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
-#        y_ticks = np.log(10) * y_powers_10
-#        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+        if log_y == 'simple':
+            ax.set_yscale('log')
+        else:
+    #         ax.set_yscale("log", nonposy='clip')
+            y_min, y_max = ax.get_ylim()
+    #        y_min_pow_10 = np.ceil(y_min * np.log10(np.e))
+    #        y_max_pow_10 = np.ceil(y_max * np.log10(np.e))
 
-        # Trying y-ticks at fixed intervals
-        # real_y_min = np.exp(y_min)
-        # real_y_max = np.exp(y_max)
-        
-        # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
-        # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
-        
-        real_y_ticks = log_y_custom_ticks
-        y_ticks = np.log(real_y_ticks)
-        
-        ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
+    #        y_powers_10 = np.arange(y_min_pow_10, y_max_pow_10)
+    #        y_ticks = np.log(10) * y_powers_10
+    #        y_tick_labels = [f'$10^{{ {int(y_tick)} }}$' for y_tick in y_powers_10]
+
+            # Trying y-ticks at fixed intervals
+            # real_y_min = np.exp(y_min)
+            # real_y_max = np.exp(y_max)
+
+            # scaled_y_min = np.ceil(real_y_min / log_y_tick_interval) * log_y_tick_interval
+            # scaled_y_max = np.ceil(real_y_max / log_y_tick_interval) * log_y_tick_interval
+
+            real_y_ticks = log_y_custom_ticks
+            y_ticks = np.log(real_y_ticks)
+
+            ax.set_yticks(y_ticks)
+            ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
         
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Episode number{log_x and ")" or ""}'    
@@ -398,6 +450,9 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     
     if y_label_right:
         ax.yaxis.set_label_position("right")
+    
+    if regression_legend:
+        ax.legend(loc='best')
     
     if title is None:
         title = f'Number of tasks trained on'
@@ -433,7 +488,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           num_tasks_trained_highlight_first_time=None, 
                                           add_subfigure_texts=False, add_colorbars=True,
                                           save_path=None, external_axes=None, num_times_trained_title='',
-                                          num_tasks_trained_title=''):
+                                          num_tasks_trained_title='', plot_regression=False, regression_legend=False):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6.5
@@ -484,7 +539,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict)
+                                     title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
+                                     plot_regression=plot_regression, regression_legend=regression_legend)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[2 * ax_index + 1]
@@ -498,7 +554,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                       font_dict=font_dict, x_label=x_label, y_label=y_label,
                                       highlight_first_time=num_tasks_trained_highlight_first_time,
-                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict)
+                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
+                                      plot_regression=plot_regression, regression_legend=regression_legend)
         
         if (ax_index == len(dimension_names) - 1) and add_colorbars:
             add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[3][data_index].mean.shape[0],

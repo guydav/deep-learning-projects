@@ -143,6 +143,7 @@ if __name__ == '__main__':
         train_dataset_kwargs['batch_size'] = train_batch_size
 
     if args.balanced_batches:
+        print('Using balanced batches')
         train_dataset_class = BalancedBatchesMetaLearningDataset
         train_shuffle = False
 

@@ -11,7 +11,7 @@ from datetime import datetime
 import tabulate
 import wandb
 from collections import namedtuple
-
+import json
 
 API = wandb.Api()
 
@@ -286,22 +286,30 @@ def pretty_print_results(results, **kwargs):
 DEFAULT_PROJECT_PATH = 'meta-learning-scaling/sequential-benchmark-baseline'
     
     
-def load_runs(max_rep_id, project_path=DEFAULT_PROJECT_PATH, split_runs_by_dimension=True):
+def load_runs(max_rep_id, project_path=DEFAULT_PROJECT_PATH, split_runs_by_dimension=True,
+              valid_run_ids=None, debug=False):
     runs = API.runs(project_path)
     
     results = ConditionAnalysesSet([], [], [], [])
     
     for run in runs:
-        run_name = run.description.split('\n')[0]
-        run_id = int(run_name[run_name.rfind('-') + 1:])
-        dimension = (run_id // 1000) - 1
-        rep = run_id % 1000
-        if rep < max_rep_id:
-            # combined / all runs
-            results[COMBINED_INDEX].append(run)
-            # by-dimension
-            if split_runs_by_dimension:
-                    results[dimension].append(run)
+        config = json.loads(run.json_config)
+        run_id = int(config['dataset_random_seed']['value'])
+        
+        if debug: print(run.name, run_id)
+        
+        # run_name = run.description.split('\n')[0]
+        # run_id = int(run_name[run_name.rfind('-') + 1:])
+        
+        if valid_run_ids is None or run_id in valid_run_ids:
+            dimension = (run_id // 1000) - 1
+            rep = run_id % 1000
+            if rep < max_rep_id:
+                # combined / all runs
+                results[COMBINED_INDEX].append(run)
+                # by-dimension
+                if split_runs_by_dimension:
+                        results[dimension].append(run)
             
     return results
 

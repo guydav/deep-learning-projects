@@ -190,7 +190,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
         
     raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
                         log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
-                        font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                        font_dict=font_dict, x_label=x_label, y_label=y_label,
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
                         custom_x_ticks=generate_custom_ticks(), text=first_task_text, text_x=text_x, text_y=text_y)
         
@@ -224,11 +224,15 @@ def fit_regression_line(x, y, log_x=False, log_y=False, index_increment=1):
     return np.polynomial.polynomial.polyfit(x, y, 1)
 
 
+LINESTYLE_OPTIONS = ['--', ':']
+
+
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                 title=None, hline_y=None, hline_style=None, 
+                                 title=None, hline_y=None, hline_style=None, y_custom_tick_labels=None,
                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
-                                 text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False):
+                                 text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False,
+                                 mark_lines=None, num_lines_to_mark=0):
     if font_dict is None:
         font_dict = {}
         
@@ -251,7 +255,12 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         reg_x_values.extend(x_values)
         y_means = np.diag(results.mean, task)
         reg_y_values.extend(y_means)
-        ax.plot(x_values, y_means, marker='.', markersize=12, color=colors(task / num_points))
+        
+        linestyle = None
+        if mark_lines == 'style' and task < num_lines_to_mark:
+            linestyle = LINESTYLE_OPTIONS[task]
+        
+        ax.plot(x_values, y_means, marker='.', markersize=12, linestyle=linestyle, color=colors(task / num_points))
         
         if shade_error:
             y_stds = np.diag(results.std, task) / (sem_n ** 0.5)
@@ -266,14 +275,16 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         
     if plot_regression:
         (intercept, slope) = fit_regression_line(reg_x_values, reg_y_values, log_x=log_x)
-        label = f'{log_y and "log(" or ""}y{log_y and ")" or ""} = {slope:.3} {log_x and "log(" or ""}x{log_x and ")" or ""} + {intercept:.3}'
-        x_reg = np.arange(1, results.mean.shape[0] + 1)
-        if log_x:
-            y_reg = intercept + slope * np.log(x_reg)
-        else:
-            y_reg = intercept + slope * x_reg
-        ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
+        label = f'{log_y and "log(" or ""}y{log_y and ")" or ""} = {slope:.4} {log_x and "log(" or ""}x{log_x and ")" or ""} + {intercept:.4}'
         print(label)
+        if plot_regression != 'print': 
+            x_reg = np.arange(1, results.mean.shape[0] + 1)
+            if log_x:
+                y_reg = intercept + slope * np.log(x_reg)
+            else:
+                y_reg = intercept + slope * x_reg
+            ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
+        
         
     if ylim is not None:
         ax.set_ylim(ylim)
@@ -309,6 +320,8 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
 
             ax.set_yticks(y_ticks)
             ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
+    elif y_custom_tick_labels is not None:
+        ax.set_yticklabels(y_custom_tick_labels)
     
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Number of times trained{log_x and ")" or ""}'
@@ -341,9 +354,10 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                   font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                  title=None, hline_y=None, hline_style=None, highlight_first_time=None,
-                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
-                                  text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False):
+                                  title=None, hline_y=None, hline_style=None, highlight_first_time=None, 
+                                  y_custom_tick_labels=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, 
+                                  title_font_dict=None, text=None, text_x=None, text_y=None, 
+                                  plot_regression=False, regression_legend=False):
     if font_dict is None:
         font_dict = {}
         
@@ -362,6 +376,8 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         reg_x_values.extend(x_values)
         y_means = results.mean[task, task:]
         reg_y_values.extend(y_means)
+        
+        y_stds = None
         if results.std is not None:
             y_stds = results.std[task, task:] / (sem_n ** 0.5)
         
@@ -380,6 +396,9 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
                 color = '#C0C0C0'
                 
             if 'highlight' in highlight_first_time:
+                if y_stds is None:
+                    y_stds = 0.025
+                    
                 ax.plot(x_values, y_means - 3 * y_stds, linestyle=':', lw=2, color='red', alpha=1.0)
                 ax.plot(x_values, y_means + 3 * y_stds, linestyle=':', lw=2, color='red', alpha=1.0)
             
@@ -398,13 +417,15 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     if plot_regression:
         (intercept, slope) = fit_regression_line(reg_x_values, reg_y_values, log_x=log_x)
         label = f'{log_y and "log(" or ""}y{log_y and ")" or ""} = {slope:.3} {log_x and "log(" or ""}x{log_x and ")" or ""} + {intercept:.3}'
-        x_reg = np.arange(1, results.mean.shape[0] + 1)
-        if log_x:
-            y_reg = intercept + slope * np.log(x_reg)
-        else:
-            y_reg = intercept + slope * x_reg
-        ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
         print(label)
+        if plot_regression != 'print': 
+            x_reg = np.arange(1, results.mean.shape[0] + 1)
+            if log_x:
+                y_reg = intercept + slope * np.log(x_reg)
+            else:
+                y_reg = intercept + slope * x_reg
+            ax.plot(x_reg, y_reg, ls='--', label=label, lw=3, color='red')
+        
     
     if ylim is not None:
         ax.set_ylim(ylim)
@@ -440,6 +461,8 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
 
             ax.set_yticks(y_ticks)
             ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
+    elif y_custom_tick_labels is not None:
+        ax.set_yticklabels(y_custom_tick_labels)
         
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Episode number{log_x and ")" or ""}'    
@@ -489,7 +512,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           num_tasks_trained_highlight_first_time=None, 
                                           add_subfigure_texts=False, add_colorbars=True,
                                           save_path=None, external_axes=None, num_times_trained_title='',
-                                          num_tasks_trained_title='', plot_regression=False, regression_legend=False):
+                                          num_tasks_trained_title='', plot_regression=False, regression_legend=False,
+                                          mark_lines=None, num_lines_to_mark=0):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6.5
@@ -541,7 +565,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
-                                     plot_regression=plot_regression, regression_legend=regression_legend)
+                                     plot_regression=plot_regression, regression_legend=regression_legend,
+                                     mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[2 * ax_index + 1]
@@ -830,9 +855,10 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                               comparison_mod_level, dimension_index=COMBINED_INDEX, comparison_func=np.subtract,
                               font_dict=None, comparison_first=False, ylim=None, data_index=None, 
                               log_x=True, log_y=True, shade_error=True, sem_n=1, baseline_sem_n=1, 
+                              title_font_dict=None, y_custom_tick_labels=None,
                               times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
                               null_hline_y=None, null_hline_style=None, plot_y_label='', add_colorbars=True,
-                              save_path=None, external_axes=None):
+                              save_path=None, external_axes=None, replication_levels=None, custom_titles=None):
     
     if comparison_mod_level < 0 or comparison_mod_level > 4:
         raise ValueError('Comparison model level should be between 0 and 4 inclusive')
@@ -890,11 +916,15 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
             results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
                                            baseline[dimension_index][data_index].mean)
         else:
-            results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
-                                           baseline[dimension_index][data_index].mean)
+            results_mean = comparison_func(baseline[dimension_index][data_index].mean,
+                                           comparison_set[dimension_index][data_index].mean)
             
-        # TODO: fix the stddev computation if we ever decide to use it here
-        results_std = comparison_set[dimension_index][data_index].std
+        if comparison_func == np.subtract:
+            results_std = np.sqrt(np.power(baseline[dimension_index][data_index].std, 2) + np.power(comparison_set[dimension_index][data_index].std, 2))
+        else:
+            # TODO: fix the stddev computation if we ever decide to use it here
+            results_std = comparison_set[dimension_index][data_index].std
+            
         results = ResultSet(name='diff', mean=results_mean, std=results_std)
 
         title = None  # use the default title
@@ -904,7 +934,9 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style)
+                                     y_custom_tick_labels=y_custom_tick_labels,
+                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                     title_font_dict=title_font_dict)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[1]
@@ -915,10 +947,17 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
                                       font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
-                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style)
+                                      y_custom_tick_labels=y_custom_tick_labels,
+                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                      title_font_dict=title_font_dict)
     
     # plot per query
-    for replication_level, replication_analyses in per_query_replication.items():
+    if replication_levels == None:
+        replication_levels = sorted(per_query_replication.keys())
+    
+    for replication_level in replication_levels:
+        replication_analyses = per_query_replication[replication_level]
+        
         if replication_level == comparison_mod_level:
             continue
 
@@ -938,13 +977,21 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
             results_mean = comparison_func(replication_analyses[dimension_index][data_index].mean,
                                            comparison_set[dimension_index][data_index].mean)
 
-        # TODO: fix the stddev computation if we ever decide to use it
-        results_std = comparison_set[dimension_index][data_index].std
+        if comparison_func == np.subtract:
+            results_std = np.sqrt(np.power(replication_analyses[dimension_index][data_index].std, 2) + np.power(comparison_set[dimension_index][data_index].std, 2))
+        else:
+            # TODO: fix the stddev computation if we ever decide to use it here
+            results_std = comparison_set[dimension_index][data_index].std
+            
         results = ResultSet(name='diff', mean=results_mean, std=results_std)
     
         title = ''
         if len(per_query_replication) > 1:
-            title = f'Conv-{replication_level} modulation'
+            if custom_titles is not None:
+                title = custom_titles[0]
+                custom_titles = custom_titles[1:]
+            else:
+                title = f'Conv-{replication_level} modulation'
 
         x_label = None
         # if replication_level_for_axes + 1 == COMPARISON_NROWS:
@@ -957,7 +1004,9 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style)
+                                     y_custom_tick_labels=y_custom_tick_labels,
+                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                     title_font_dict=title_font_dict)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[1]
@@ -970,7 +1019,9 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                       log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
                                       font_dict=font_dict, x_label=x_label, y_label=y_label,
-                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style)
+                                      y_custom_tick_labels=y_custom_tick_labels,
+                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                      title_font_dict=title_font_dict)
         
         if (replication_level_for_axes == len(per_query_replication) - 1) and add_colorbars:
             add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],

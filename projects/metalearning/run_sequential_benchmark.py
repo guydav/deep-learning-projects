@@ -67,6 +67,8 @@ DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
 parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
 parser.add_argument('--return_indices', action='store_true')
 
+parser.add_argument('--balanced_batches', action='store_true')
+
 parser.add_argument('--debug', action='store_true')
 
 
@@ -133,11 +135,16 @@ if __name__ == '__main__':
         previous_query_coreset_size=train_coreset_size,
         coreset_size_per_query=train_coreset_size_per_query,
     )
+    train_dataset_class = None
 
     if args.maml:
+        args.balanced_batches = True
         train_batch_size = batch_size // 2
-        train_shuffle = False
         train_dataset_kwargs['batch_size'] = train_batch_size
+
+    if args.balanced_batches:
+        train_dataset_class = BalancedBatchesMetaLearningDataset
+        train_shuffle = False
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,
@@ -153,7 +160,7 @@ if __name__ == '__main__':
                                        random_seed=dataset_random_seed,
                                        query_order=query_order
                                    ),
-                                   train_dataset_class=BalancedBatchesMetaLearningDataset,
+                                   train_dataset_class=train_dataset_class,
                                    train_dataset_kwargs=train_dataset_kwargs,
                                    test_dataset_kwargs=dict(
                                        previous_query_coreset_size=test_coreset_size,

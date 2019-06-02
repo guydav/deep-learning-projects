@@ -146,6 +146,9 @@ if __name__ == '__main__':
         print('Using balanced batches')
         train_dataset_class = BalancedBatchesMetaLearningDataset
         train_shuffle = False
+        
+        if 'batch_size' not in train_dataset_kwargs:
+            train_dataset_kwargs['batch_size'] = batch_size
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,

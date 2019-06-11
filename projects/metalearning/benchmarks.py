@@ -7,7 +7,8 @@ DEFAULT_ACCURACY_THRESHOLD = 0.95
 def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold=DEFAULT_ACCURACY_THRESHOLD,
                          threshold_all_queries=True,
                          num_epochs=1000, epochs_to_graph=None, cuda=True, save=True, start_epoch=0,
-                         watch=True, debug=False, save_name='model', train_epoch_func=train_epoch):
+                         watch=True, debug=False, save_name='model',
+                         train_epoch_func=train_epoch, test_epoch_func=test):
     """
     Execute the sequential benchmark as described in the paper.
     :param model: Which model to train and test according to the benchmark
@@ -58,7 +59,7 @@ def sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_thre
         if save:
             model.save_model()
 
-        test_results = test(model, test_dataloader, cuda, device, True)
+        test_results = test_epoch_func(model, test_dataloader, cuda, device, True)
         print_status(model, epoch, 'TEST', test_results)
 
         current_query_index = train_dataloader.dataset.current_query_index

@@ -68,6 +68,7 @@ parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_F
 parser.add_argument('--return_indices', action='store_true')
 
 parser.add_argument('--balanced_batches', action='store_true')
+parser.add_argument('--maml_meta_test', action='store_true')
 
 parser.add_argument('--debug', action='store_true')
 
@@ -104,6 +105,10 @@ if __name__ == '__main__':
     test_coreset_size = args.test_coreset_size
     train_coreset_size_per_query = bool(args.coreset_size_per_query)
 
+    if args.maml_meta_test and not args.maml:
+        print('maml_meta_test can only be set to true if maml is. Aborting...')
+        sys.exit(1)
+
     if args.query_order is not None:
         query_order = np.array([int(x) for x in args.query_order.split(' ')])
 
@@ -129,24 +134,38 @@ if __name__ == '__main__':
     total_epochs = args.max_epochs
     threshold_all_queries = bool(args.threshold_all_queries)
 
+    train_dataset_class = None
     train_batch_size = None
-    train_shuffle = None
+    train_shuffle = True
     train_dataset_kwargs = dict(
         previous_query_coreset_size=train_coreset_size,
         coreset_size_per_query=train_coreset_size_per_query,
     )
-    train_dataset_class = None
+
+    test_dataset_class = None
+    test_batch_size = None
+    test_shuffle = True
+    test_dataset_kwargs = dict(
+        previous_query_coreset_size=test_coreset_size,
+        coreset_size_per_query=True,
+    )
 
     if args.maml:
         args.balanced_batches = True
         train_batch_size = batch_size // 2
         train_dataset_kwargs['batch_size'] = train_batch_size
 
+        if args.maml_meta_test:
+            test_dataset_class = BalancedBatchesMetaLearningDataset
+            test_shuffle = False
+            test_dataset_kwargs['batch_size'] = train_batch_size
+            test_batch_size = train_batch_size
+
     if args.balanced_batches:
         print('Using balanced batches')
         train_dataset_class = BalancedBatchesMetaLearningDataset
         train_shuffle = False
-        
+
         if 'batch_size' not in train_dataset_kwargs:
             train_dataset_kwargs['batch_size'] = batch_size
 
@@ -166,12 +185,12 @@ if __name__ == '__main__':
                                    ),
                                    train_dataset_class=train_dataset_class,
                                    train_dataset_kwargs=train_dataset_kwargs,
-                                   test_dataset_kwargs=dict(
-                                       previous_query_coreset_size=test_coreset_size,
-                                       coreset_size_per_query=True,
-                                   ),
+                                   test_dataset_class=test_dataset_class,
+                                   test_dataset_kwargs=test_dataset_kwargs,
                                    train_shuffle=train_shuffle,
-                                   train_batch_size=train_batch_size)
+                                   test_shuffle=test_shuffle,
+                                   train_batch_size=train_batch_size,
+                                   test_batch_size=test_batch_size)
 
     learning_rate = args.learning_rate
     weight_decay = args.weight_decay
@@ -239,8 +258,13 @@ if __name__ == '__main__':
     if args.debug: print('After wandb init')
 
     train_epoch_func = train_epoch
+    test_epoch_func = test
+
     if args.maml:
         train_epoch_func = maml_train_epoch
+
+        if args.maml_meta_test:
+            test_epoch_func = maml_test_epoch
 
     if args.debug: print('Calling sequential bechmark')
 
@@ -251,4 +275,4 @@ if __name__ == '__main__':
                          start_epoch=current_epoch,
                          debug=args.debug,
                          save_name=f'{args.name}-{dataset_random_seed}',
-                         train_epoch_func=train_epoch_func)
+                         train_epoch_func=train_epoch_func, test_epoch_func=test_epoch_func)

@@ -123,6 +123,99 @@ class MamlModel(BasicModel):
         return dict(accuracy=meta_train_accuracy, loss=meta_loss.item(),
                     auc=auc, per_query_results=per_query_results)
 
+    def maml_test_(self, X_test, Q_test, y_test, X_meta_test, Q_meta_test, y_meta_test,
+                   active_tasks, debug=False):
+        """
+        """
+        if self.optimizer is None:
+            self._create_optimizer()
+            self._create_fast_weight_optimizer()
+
+        meta_objective_loss = 0
+        meta_test_correct = []
+        meta_test_preds_for_auc = []
+        meta_test_labels_for_auc = []
+
+        _, test_task_indices = Q_test.max(1)
+        _, meta_test_task_indices = Q_meta_test.max(1)
+
+        pre_training_weights = copy.deepcopy(self.state_dict())
+        need_load = False
+
+        for task in active_tasks:
+            # No need to load the first time around
+            if need_load:
+                self.load_state_dict(pre_training_weights)
+            need_load = True
+
+            if debug: print(pre_training_weights['fcout.fc5.weight'])
+
+            # extract training and meta-training data for task
+            test_task_examples = test_task_indices == task
+            X_test_task = X_test[test_task_examples]
+            Q_test_task = Q_test[test_task_examples]
+            y_test_task = y_test[test_task_examples]
+
+            meta_test_task_examples = meta_test_task_indices == task
+            X_meta_test_task = X_meta_test[meta_test_task_examples]
+            Q_meta_test_task = Q_meta_test[meta_test_task_examples]
+            y_meta_test_task = y_meta_test[meta_test_task_examples]
+
+            if debug: print(task, torch.sum(test_task_examples), torch.sum(meta_test_task_examples))
+
+            # train on task
+            self.fast_weight_optimizer.zero_grad()
+            task_output = self(X_test_task, Q_test_task)
+            task_loss = self.loss(task_output, y_test_task)
+            task_loss.backward()
+            self.fast_weight_optimizer.step()
+            # task_grad = autograd.grad(task_loss, self.parameters())
+            # task_fast_weights = list(map(lambda p, g: p - self.fast_weight_lr * g, self.parameters(), task_grad))
+
+            # meta-train on task
+            # meta_train_model_state = meta_train_model_copy.state_dict()
+            # param_names = meta_train_model_state.keys()
+            # for name, fast_weight in zip(param_names, task_fast_weights):
+            #     meta_train_model_state[name] = fast_weight
+            #
+            # meta_train_model_copy.load_state_dict(meta_train_model_state)
+
+            # meta_task_output = meta_train_model_copy(X_meta_train_task, Q_meta_train_task)
+            # meta_task_loss = meta_train_model_copy.loss(meta_task_output, y_meta_train_task)
+            # meta_objective_losses.append(meta_task_loss)
+
+            # no need for the gradient here:
+            with torch.no_grad():
+                meta_task_output = self(X_meta_test_task, Q_meta_test_task)
+                # on the meta-objective, sum, rather than average
+                meta_task_loss = self.loss(meta_task_output, y_meta_test_task)
+                meta_objective_loss += meta_task_loss * X_meta_test_task.shape[0]
+
+                meta_task_pred = meta_task_output.data.max(1)[1]
+                meta_test_preds_for_auc.append(meta_task_pred.data.cpu().numpy())
+                meta_task_correct = meta_task_pred.eq(y_meta_test_task.data).cpu()
+                meta_test_correct.append(meta_task_correct.numpy())
+                meta_test_labels_for_auc.append(y_meta_test_task.data.cpu().numpy())
+
+        # reload the pre-testing weights, compute the meta-loss
+        self.load_state_dict(pre_training_weights)
+        meta_loss = meta_objective_loss / X_meta_test.shape[0]
+
+        with torch.no_grad():
+            meta_train_accuracy = np.concatenate(meta_test_correct).ravel().mean() * 100
+
+            try:
+                all_meta_train_labels = np.concatenate(meta_test_labels_for_auc).ravel()
+                all_meta_train_preds = np.concatenate(meta_test_preds_for_auc).ravel()
+                auc = roc_auc_score(all_meta_train_labels, all_meta_train_preds)
+            except ValueError:
+                auc = None
+
+            per_query_results = {task: list(correct) for task, correct in zip(active_tasks, meta_test_correct)}
+
+        return dict(accuracy=meta_train_accuracy, loss=meta_loss.item(),
+                    auc=auc, per_query_results=per_query_results)
+
 
 class MamlPoolingDropoutCNNMLP(CNNMLPMixIn, MamlModel):
     """
@@ -174,7 +267,6 @@ class MamlPoolingDropoutCNNMLP(CNNMLPMixIn, MamlModel):
         self.lr_scheduler_patience = lr_scheduler_patience
 
 
-
 def maml_train_epoch(model, dataloader, cuda=True, device=None,
                      num_batches_to_print=DEFAULT_NUM_BATCHES_TO_PRINT, debug=False):
 
@@ -211,6 +303,51 @@ def maml_train_epoch(model, dataloader, cuda=True, device=None,
         {query: np.mean(values) for query, values in epoch_results['per_query_results'].items()})
 
     return epoch_results
+
+
+def maml_test_epoch(model, dataloader, cuda=True, device=None, training=False, debug=False):
+    """
+    Test a model through an entire epoch, aggregating results.
+    :param model: The model being trained
+    :param dataloader: The PyTorch dataloader, iterated through to retrieve epochs
+    :param cuda: Whether or not to use CUDA (GPU acceleration)
+    :param device: If using CUDA, which device to use; if None and cuda=True, using the default
+    :param training: Whether or not in training mode. If true, calls the model's post_test function
+        after done testing. Used for learning rate scheduler purposes.
+    :return: Aggregated model results (accuracy, loss, auc, etc.) for the entire epoch
+    """
+    test_results = defaultdict(list)
+    test_results['per_query_results'] = defaultdict(list)
+
+    dataloader_iter = iter(dataloader)
+
+    with torch.no_grad():
+        for batch_index, train_batch in enumerate(dataloader_iter):
+            X_train, Q_train, y_train = split_batch(train_batch, cuda, device, model)
+            meta_train_batch = next(dataloader_iter)
+            X_meta_train, Q_meta_train, y_meta_train = split_batch(meta_train_batch, cuda, device, model)
+
+            results = model.maml_test_(X_train, Q_train, y_train, X_meta_train, Q_meta_train, y_meta_train,
+                                        dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1],
+                                        debug=debug)
+
+            test_results['accuracies'].append(results['accuracy'])
+            test_results['losses'].append(results['loss'])
+            if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
+
+            for query in results['per_query_results']:
+                test_results['per_query_results'][query].extend(results['per_query_results'][query])
+
+        model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
+        mean_loss = np.mean(test_results['losses'])
+        model.results['test_losses'].append(mean_loss)
+        model.results['test_aucs'].append(np.mean(test_results['aucs']))
+        model.results['test_per_query_accuracies'].append(
+            {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
+
+        if training: model.post_test(mean_loss, len(model.results['test_losses']))
+
+    return test_results
 
 
 def split_batch(batch, cuda, device, model):

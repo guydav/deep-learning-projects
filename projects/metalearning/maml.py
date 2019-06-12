@@ -325,7 +325,13 @@ def maml_test_epoch(model, dataloader, cuda=True, device=None, training=False, d
     # with torch.no_grad():
     for batch_index, test_batch in enumerate(dataloader_iter):
         X_test, Q_test, y_test = split_batch(test_batch, cuda, device, model)
-        meta_test_batch = next(dataloader_iter)
+        try:
+            meta_test_batch = next(dataloader_iter)
+
+        # quickest way to handle a stop iteration -- ignore the last batch of data
+        except StopIteration:
+            break
+
         X_meta_test, Q_meta_test, y_meta_test = split_batch(meta_test_batch, cuda, device, model)
 
         results = model.maml_test_(X_test, Q_test, y_test, X_meta_test, Q_meta_test, y_meta_test,

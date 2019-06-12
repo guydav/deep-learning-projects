@@ -321,31 +321,32 @@ def maml_test_epoch(model, dataloader, cuda=True, device=None, training=False, d
 
     dataloader_iter = iter(dataloader)
 
-    with torch.no_grad():
-        for batch_index, train_batch in enumerate(dataloader_iter):
-            X_train, Q_train, y_train = split_batch(train_batch, cuda, device, model)
-            meta_train_batch = next(dataloader_iter)
-            X_meta_train, Q_meta_train, y_meta_train = split_batch(meta_train_batch, cuda, device, model)
+    # We do actually need gradients inside, to take the single-steps in meta-testing
+    # with torch.no_grad():
+    for batch_index, test_batch in enumerate(dataloader_iter):
+        X_test, Q_test, y_test = split_batch(test_batch, cuda, device, model)
+        meta_test_batch = next(dataloader_iter)
+        X_meta_test, Q_meta_test, y_meta_test = split_batch(meta_test_batch, cuda, device, model)
 
-            results = model.maml_test_(X_train, Q_train, y_train, X_meta_train, Q_meta_train, y_meta_train,
-                                        dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1],
-                                        debug=debug)
+        results = model.maml_test_(X_test, Q_test, y_test, X_meta_test, Q_meta_test, y_meta_test,
+                                    dataloader.dataset.query_order[:dataloader.dataset.current_query_index + 1],
+                                    debug=debug)
 
-            test_results['accuracies'].append(results['accuracy'])
-            test_results['losses'].append(results['loss'])
-            if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
+        test_results['accuracies'].append(results['accuracy'])
+        test_results['losses'].append(results['loss'])
+        if 'auc' in results and results['auc'] is not None: test_results['aucs'].append(results['auc'])
 
-            for query in results['per_query_results']:
-                test_results['per_query_results'][query].extend(results['per_query_results'][query])
+        for query in results['per_query_results']:
+            test_results['per_query_results'][query].extend(results['per_query_results'][query])
 
-        model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
-        mean_loss = np.mean(test_results['losses'])
-        model.results['test_losses'].append(mean_loss)
-        model.results['test_aucs'].append(np.mean(test_results['aucs']))
-        model.results['test_per_query_accuracies'].append(
-            {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
+    model.results['test_accuracies'].append(np.mean(test_results['accuracies']))
+    mean_loss = np.mean(test_results['losses'])
+    model.results['test_losses'].append(mean_loss)
+    model.results['test_aucs'].append(np.mean(test_results['aucs']))
+    model.results['test_per_query_accuracies'].append(
+        {query: np.mean(values) for query, values in test_results['per_query_results'].items()})
 
-        if training: model.post_test(mean_loss, len(model.results['test_losses']))
+    if training: model.post_test(mean_loss, len(model.results['test_losses']))
 
     return test_results
 

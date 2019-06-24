@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib import path as mpath
 from matplotlib import ticker
+from matplotlib.transforms import Bbox
 import numpy as np
 
 from meta_learning_data_analysis import *
@@ -33,7 +34,7 @@ WRAPFIGURE_TEMPLATE = r'''\begin{{wrapfigure}}{{r}}{{0.5\linewidth}}
 % \vspace{{-.25in}}
 \end{{wrapfigure}}'''
 
-def save(save_path):
+def save(save_path, bbox_inches='tight'):
     if save_path is not None:
         save_path_no_ext = os.path.splitext(save_path)[0]
         print('Figure:\n')
@@ -47,28 +48,47 @@ def save(save_path):
         
         folder, filename = os.path.split(save_path)
         os.makedirs(folder, exist_ok=True)
-        plt.savefig(save_path, bbox_inches='tight', facecolor=plt.gcf().get_facecolor(), edgecolor='none')
+        plt.savefig(save_path, bbox_inches=bbox_inches, facecolor=plt.gcf().get_facecolor(), edgecolor='none')
 
+
+def full_extent(ax, pad=0.0):
+    """Get the full extent of an axes, including axes labels, tick labels, and
+    titles."""
+    # For text objects, we need to draw the figure first, otherwise the extents
+    # are undefined.
+    ax.figure.canvas.draw()
+    items = ax.get_xticklabels() + ax.get_yticklabels() 
+#    items += [ax, ax.title, ax.xaxis.label, ax.yaxis.label]
+    items += [ax, ax.get_xaxis().get_label(), ax.get_yaxis().get_label()] # ax.title, 
+    bbox = Bbox.union([item.get_window_extent() for item in items])
+
+    return bbox.expanded(1.0 + pad, 1.0 + pad)
+        
 
 def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples, 
                         log_x=False, shade_error=False, sem_n=1, ylim=None,
                         font_dict=None, x_label=None, y_label=None, y_label_right=False, 
                         title=None, hline_y=None, hline_style=None, title_font_dict=None, 
-                        custom_x_ticks=None, text=None, text_x=None, text_y=None):
+                        custom_x_ticks=None, text=None, text_x=None, text_y=None, num_tasks_to_plot=None):
     if font_dict is None:
         font_dict = {}
         
     if title_font_dict is None:
         title_font_dict = font_dict.copy()
         
-    num_points = results.mean.shape[0]
+    num_colors = results.mean.shape[0]
+    
+    if num_tasks_to_plot is None:
+        num_points = results.mean.shape[0]
+    else:
+        num_points = num_tasks_to_plot
       
     for row in range(num_points):
         max_x = np.argmax(np.isnan(results.mean[row, :]))
         x_values = np.arange(1, max_x + 1) * epochs_to_training_examples(row)
         y_means = results.mean[row, :max_x]
         
-        ax.plot(x_values, y_means, color=colors(row / num_points))
+        ax.plot(x_values, y_means, color=colors(row / num_colors))
         
         if shade_error:
             if hasattr(sem_n, 'shape') and sem_n.shape == results.std.shape:
@@ -78,7 +98,7 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
                 
             y_stds = np.divide(results.std[row, :max_x], n ** 0.5)
             ax.fill_between(x_values, y_means - y_stds, y_means + y_stds,
-                            color=colors(row / num_points), alpha=0.25)        
+                            color=colors(row / num_colors), alpha=0.25)        
             
     if hline_y is not None:
         hline = DEFAULT_COMPARISON_HLINE_STYLE.copy()
@@ -128,7 +148,7 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
 
     
 def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, dimension_index=COMBINED_INDEX,
-                            shade_error=False, font_dict=None, hline_y=None, hline_style=None,
+                            shade_error=False, font_dict=None, hline_y=None, hline_style=None, num_tasks_to_plot=None,
                             first_task_title='First task accuracy by times trained',
                             new_task_title='New task accuracy by task order',
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
@@ -138,6 +158,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     NCOLS = 1
     COL_WIDTH = 6
     ROW_HEIGHT = 5 
+    
+    axes = []
     
     if font_dict is None:
         font_dict = {}
@@ -162,6 +184,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
         new_task_ax = external_axes[0]
     else:
         new_task_ax = plt.subplot(NROWS, NCOLS, 1) 
+        axes.append(new_task_ax)
+        
     results = result_set[dimension_index].new_task_accuracies
     title = new_task_title
     x_label = None
@@ -174,12 +198,15 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                         log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
-                        custom_x_ticks=generate_custom_ticks(4000, 10, 2), text=new_task_text, text_x=text_x, text_y=text_y)
+                        custom_x_ticks=generate_custom_ticks(4000, 10, 2), text=new_task_text, 
+                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot)
     
     if external_axes is not None:
         first_task_ax = external_axes[1]
     else:
         first_task_ax = plt.subplot(NROWS, NCOLS, 2)
+        axes.append(first_task_ax)
+        
     results = result_set[dimension_index].first_task_accuracies
     title = first_task_title
     x_label = None
@@ -192,7 +219,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                         log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
                         font_dict=font_dict, x_label=x_label, y_label=y_label,
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
-                        custom_x_ticks=generate_custom_ticks(), text=first_task_text, text_x=text_x, text_y=text_y)
+                        custom_x_ticks=generate_custom_ticks(), text=first_task_text, 
+                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot)
         
     if add_colorbars:
         add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
@@ -201,7 +229,15 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                              y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
 
     if external_axes is None:
-        save(save_path)
+        if isinstance(save_path, list) or isinstance(save_path, tuple) and len(save_path) == len(axes):
+            for ax, path in zip(axes, save_path):
+                # extent = full_extent(ax).transformed(figure.dpi_scale_trans.inverted())
+                extent = ax.get_tightbbox(figure.canvas.get_renderer()).transformed(figure.dpi_scale_trans.inverted())
+                save(path, bbox_inches=extent)
+        
+        else:
+            save(save_path)
+            
         plt.show()
 
     
@@ -232,14 +268,22 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
                                  title=None, hline_y=None, hline_style=None, y_custom_tick_labels=None,
                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
                                  text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False,
-                                 mark_lines=None, num_lines_to_mark=0):
+                                 mark_lines=None, num_lines_to_mark=0, num_tasks_to_plot=None):
     if font_dict is None:
         font_dict = {}
         
     if title_font_dict is None:
         title_font_dict = font_dict.copy()
         
-    num_points = results.mean.shape[0]
+    num_colors = results.mean.shape[0]
+    
+    if num_tasks_to_plot is None:
+        num_points = results.mean.shape[0]
+    else:
+        num_points = num_tasks_to_plot
+    
+    print(num_tasks_to_plot, num_points)
+        
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
     means = [results.mean[r, c] for (r, c) in zip(nonzero_rows, nonzero_cols)]
     
@@ -251,7 +295,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     reg_y_values = []
     
     for task in range(num_points):
-        x_values = np.arange(1, num_points - task + 1)
+        x_values = np.arange(1, num_colors - task + 1)
         reg_x_values.extend(x_values)
         y_means = np.diag(results.mean, task)
         reg_y_values.extend(y_means)
@@ -260,12 +304,15 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         if mark_lines == 'style' and task < num_lines_to_mark:
             linestyle = LINESTYLE_OPTIONS[task]
         
-        ax.plot(x_values, y_means, marker='.', markersize=12, linestyle=linestyle, color=colors(task / num_points))
+        print(x_values)
+        print(y_means)
+        
+        ax.plot(x_values, y_means, marker='.', markersize=12, linestyle=linestyle, color=colors(task / num_colors))
         
         if shade_error:
             y_stds = np.diag(results.std, task) / (sem_n ** 0.5)
             ax.fill_between(x_values, y_means - y_stds, y_means + y_stds,
-                            color=colors(task / num_points), alpha=0.25)
+                            color=colors(task / num_colors), alpha=0.25)
             
     if hline_y is not None:
         if hline_style is None:
@@ -357,14 +404,20 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
                                   title=None, hline_y=None, hline_style=None, highlight_first_time=None, 
                                   y_custom_tick_labels=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, 
                                   title_font_dict=None, text=None, text_x=None, text_y=None, 
-                                  plot_regression=False, regression_legend=False):
+                                  plot_regression=False, regression_legend=False, num_tasks_to_plot=None):
     if font_dict is None:
         font_dict = {}
         
     if title_font_dict is None:
         title_font_dict = font_dict.copy()
         
-    num_points = results.mean.shape[0]
+    num_colors = results.mean.shape[0]
+    
+    if num_tasks_to_plot is None:
+        num_points = results.mean.shape[0]
+    else:
+        num_points = num_tasks_to_plot
+        
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
     means = [results.mean[r, c] for (r, c) in zip(nonzero_rows, nonzero_cols)]
     
@@ -372,7 +425,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     reg_y_values = []
 
     for task in range(num_points):
-        x_values = np.arange(task + 1, num_points + 1)
+        x_values = np.arange(task + 1, num_colors + 1)
         reg_x_values.extend(x_values)
         y_means = results.mean[task, task:]
         reg_y_values.extend(y_means)
@@ -383,7 +436,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
         
         linestyle = '-'
         marker = '.'
-        color = colors(task / num_points)
+        color = colors(task / num_colors)
         
         if task == 0 and highlight_first_time is not None:    
             if 'dash' in highlight_first_time:
@@ -513,13 +566,15 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           add_subfigure_texts=False, add_colorbars=True,
                                           save_path=None, external_axes=None, num_times_trained_title='',
                                           num_tasks_trained_title='', plot_regression=False, regression_legend=False,
-                                          mark_lines=None, num_lines_to_mark=0):
+                                          mark_lines=None, num_lines_to_mark=0, num_tasks_to_plot=None):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6.5
     ROW_HEIGHT = 5 
     WIDTH_SPACING = 1
     HEIGHT_SPACING = 0.75
+    
+    axes = []
     
     if font_dict is None:
         font_dict = {}
@@ -549,6 +604,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
             num_times_trained_ax = external_axes[2 * ax_index]
         else:
             num_times_trained_ax = plt.subplot(NROWS, NCOLS, ax_index + 1)# NCOLS * dimension_index + 1)
+            axes.append(num_times_trained_ax)
             
         results = result_set[dimension_index][data_index]
     
@@ -566,12 +622,14 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                      font_dict=font_dict, x_label=x_label, y_label=y_label, 
                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
                                      plot_regression=plot_regression, regression_legend=regression_legend,
-                                     mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark)
+                                     mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark, 
+                                     num_tasks_to_plot=num_tasks_to_plot)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[2 * ax_index + 1]
         else:
             num_tasks_trained_ax = plt.subplot(NROWS, NCOLS, NCOLS + ax_index + 1) # NCOLS * dimension_index + 2)
+            axes.append(num_tasks_trained_ax)
             
         # y_label = dimension_name.capitalize()
         title = num_tasks_trained_title
@@ -581,7 +639,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                       font_dict=font_dict, x_label=x_label, y_label=y_label,
                                       highlight_first_time=num_tasks_trained_highlight_first_time,
                                       title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
-                                      plot_regression=plot_regression, regression_legend=regression_legend)
+                                      plot_regression=plot_regression, regression_legend=regression_legend,
+                                      num_tasks_to_plot=num_tasks_to_plot)
         
         if (ax_index == len(dimension_names) - 1) and add_colorbars:
             add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
@@ -602,7 +661,15 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                      subfigure_text_font_dict, transform=figure.transFigure)
 
     if external_axes is None:
-        save(save_path)
+        if isinstance(save_path, list) or isinstance(save_path, tuple) and len(save_path) == len(axes):
+            for ax, path in zip(axes, save_path):
+                # extent = full_extent(ax).transformed(figure.dpi_scale_trans.inverted())
+                extent = ax.get_tightbbox(figure.canvas.get_renderer()).transformed(figure.dpi_scale_trans.inverted())
+                save(path, bbox_inches=extent)
+        
+        else:
+            save(save_path)
+            
         plt.show()
 
     

@@ -183,13 +183,15 @@ def parse_run_results_with_new_task_accuracy_and_equal_size(current_run_id=None,
     
     first_row_blank = int(np.isnan(current_df['Test Accuracy'][0]))
     
-    first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - 1  
+    # import pdb; pdb.set_trace()
+    
+    first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - first_row_blank
     examples_to_criterion[0, 0] = first_task_finished * examples_per_epoch(1, 1)
     absolute_accuracy[0, 0] = current_df['Test Accuracy, Query #1'][first_row_blank] # index 0 is all NaNs, presumably the initalization
     absolute_accuracy_equal_size[0, 0] = current_df['Test Accuracy, Query #1'][first_row_blank]
     
-    first_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][first_row_blank:first_task_finished + first_row_blank]
-    new_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][first_row_blank:first_task_finished + first_row_blank]
+    first_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][first_row_blank:first_task_finished]
+    new_task_accuracy_by_epoch[0, 0:first_task_finished] = current_df['Test Accuracy, Query #1'][first_row_blank:first_task_finished]
 
     for current_task in range(2, 11):
         current_task_start = current_df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
@@ -357,7 +359,8 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
             continue
         
         examples_to_criterion, absolute_accuracy, accuracy_drop, first_task_acc, new_task_acc = parse_func(current_run=run, samples=samples)
-        # print(examples_to_criterion, np.log(examples_to_criterion))
+        # print(examples_to_criterion)
+        # print(np.log(examples_to_criterion))
         examples.append(examples_to_criterion)
         log_examples.append(np.log(examples_to_criterion))
         abs_accuracies.append(absolute_accuracy)

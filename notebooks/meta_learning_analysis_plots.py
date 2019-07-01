@@ -282,7 +282,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     else:
         num_points = num_tasks_to_plot
     
-    print(num_tasks_to_plot, num_points)
+    # print(num_tasks_to_plot, num_points)
         
     nonzero_rows, nonzero_cols = np.nonzero(results.mean)
     means = [results.mean[r, c] for (r, c) in zip(nonzero_rows, nonzero_cols)]
@@ -304,8 +304,8 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
         if mark_lines == 'style' and task < num_lines_to_mark:
             linestyle = LINESTYLE_OPTIONS[task]
         
-        print(x_values)
-        print(y_means)
+        # print(x_values)
+        # print(y_means)
         
         ax.plot(x_values, y_means, marker='.', markersize=12, linestyle=linestyle, color=colors(task / num_colors))
         

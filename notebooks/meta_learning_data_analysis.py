@@ -10,7 +10,7 @@ import pickle
 from datetime import datetime
 import tabulate
 import wandb
-from collections import namedtuple
+from collections import namedtuple, defaultdict, OrderedDict
 import json
 
 API = wandb.Api()
@@ -44,12 +44,14 @@ ANALYSIS_SET_FIELDS = ['examples', 'log_examples', 'accuracies', 'accuracy_drops
                        'first_task_accuracies', 'new_task_accuracies', 'accuracy_counts',
                        'examples_by_task']
 CONDITION_ANALYSES_FIELDS = DIMENSION_NAMES + [COMBINED]
+TOTAL_CURVE_FIELDS = ['raw', 'mean', 'std', 'sem']
 
 ResultSet = namedtuple('ResultSet', RESULT_SET_FIELDS)
 AnalysisSet = namedtuple('AnalysisSet', ANALYSIS_SET_FIELDS)
 ConditionAnalysesSet = namedtuple('ConditionAnalysesSet', CONDITION_ANALYSES_FIELDS)
+TotalCurveResults = namedtuple('TotalCurveResults', TOTAL_CURVE_FIELDS)
 
-NAMED_TUPLE_CLASSES = (ResultSet, AnalysisSet, ConditionAnalysesSet)
+NAMED_TUPLE_CLASSES = (ResultSet, AnalysisSet, ConditionAnalysesSet, TotalCurveResults)
 for NamedTupleClass in NAMED_TUPLE_CLASSES:
     NamedTupleClass.__new__.__defaults__ = (None,) * len(NamedTupleClass._fields)
 
@@ -277,7 +279,50 @@ def parse_forgetting_results(current_run_id=None, current_run=None, samples=MAX_
                 
     
     return forgetting_trjectories
+
+
+def parse_total_task_training_curve(current_run_id=None, current_run=None, samples=MAX_HISTORY_SAMPLES):
+    if current_run_id is None and current_run is None:
+        print('Must provide either a current run or its id')
+        return
     
+    if current_run is None:
+        current_run = API.run(f'meta-learning-scaling/sequential-benchmark-baseline/{current_run_id}')
+        
+    current_df = current_run.history(pandas=True, samples=samples)
+    total_task_curve = defaultdict(dict)
+    task_total_trials = defaultdict(lambda: 0)
+    
+    first_row_blank = int(np.isnan(current_df['Test Accuracy'][0]))
+    first_task_finished = current_df['Test Accuracy, Query #2'].first_valid_index() - first_row_blank
+    episode_trials = examples_per_epoch(1, 1)
+    
+    for i, acc in enumerate(current_df['Test Accuracy, Query #1'][first_row_blank:first_task_finished]):
+        total_task_curve[1][(i + 1) * episode_trials] = acc
+        
+    task_total_trials[1] = (first_task_finished - first_row_blank) * episode_trials
+        
+    for current_task in range(2, 11):
+        current_task_start = current_df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
+
+        if current_task == 10:
+            current_task_end = current_df.shape[0]
+        else:
+            current_task_end = current_df[f'Test Accuracy, Query #{current_task + 1}'].first_valid_index()
+            
+        current_task_length = current_task_end - current_task_start
+
+        for task in range(1, current_task + 1):
+            episode_trials = examples_per_epoch(task, current_task)
+            
+            for i, acc in enumerate(current_df[f'Test Accuracy, Query #{task}'][current_task_start:current_task_end]):
+                total_task_curve[task][task_total_trials[task] + (i + 1) * episode_trials] = acc
+                
+            task_total_trials[task] = task_total_trials[task] + (current_task_length * episode_trials)
+    
+    # print([(t, len(total_task_curve[t].keys())) for t in range(1, 11)])
+    
+    return total_task_curve
 
 
 PRINT_HEADERS = ['###'] + [str(x) for x in range(1, 11)]
@@ -301,7 +346,12 @@ def load_runs(max_rep_id, project_path=DEFAULT_PROJECT_PATH, split_runs_by_dimen
     
     for run in runs:
         config = json.loads(run.json_config)
-        run_id = int(config['dataset_random_seed']['value'])
+        run_id = config['dataset_random_seed']['value']
+        
+        if isinstance(run_id, dict):
+            run_id = run_id['value']
+        
+        run_id = int(run_id)
         
         if debug: print(run.name, run_id)
         
@@ -411,6 +461,45 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
         return analysis, examples
     
     return analysis
+
+def process_multiple_runs_total_task_training_curves(runs, debug=False, ignore_runs=None, samples=MAX_HISTORY_SAMPLES):
+    aggregate_total_task_curve = defaultdict(lambda: defaultdict(list))
+    
+    for i, run in enumerate(runs):
+        if i > 0 and i % 10 == 0:
+            print(run.name, i)
+        else:
+            print(run.name)
+        
+        if ignore_runs is not None and run.name in ignore_runs:
+            continue
+        
+        total_task_curve = parse_total_task_training_curve(current_run=run, samples=samples)
+        for task in total_task_curve:
+            for num_trials, acc in total_task_curve[task].items():
+                aggregate_total_task_curve[task][num_trials].append(acc)
+            
+            
+    aggregate_total_task_curve_raw = defaultdict(OrderedDict)
+    aggregate_total_task_curve_mean = defaultdict(OrderedDict)
+    aggregate_total_task_curve_std = defaultdict(OrderedDict)
+    aggregate_total_task_curve_sem = defaultdict(OrderedDict)
+    
+    for task in range(1, 11):
+        for num_trials in sorted(aggregate_total_task_curve[task]):
+            accs = aggregate_total_task_curve[task][num_trials]
+            
+            aggregate_total_task_curve_raw[task][num_trials] = accs
+            aggregate_total_task_curve_mean[task][num_trials] = np.nanmean(accs)
+            
+            std = np.nanstd(accs)
+            if np.isnan(std):
+                print(f'For accs {accs}, std is nan')
+            
+            aggregate_total_task_curve_std[task][num_trials] = std
+            aggregate_total_task_curve_sem[task][num_trials] = std / (len(accs) ** 0.5)
+            
+    return aggregate_total_task_curve_raw, aggregate_total_task_curve_mean, aggregate_total_task_curve_std, aggregate_total_task_curve_sem
 
 
 def sign_test(values):

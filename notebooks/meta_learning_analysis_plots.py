@@ -1053,12 +1053,13 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         results = ResultSet(name='diff', mean=results_mean, std=results_std)
     
         title = ''
-        if len(per_query_replication) > 1:
-            if custom_titles is not None:
-                title = custom_titles[0]
-                custom_titles = custom_titles[1:]
-            else:
-                title = f'Conv-{replication_level} modulation'
+        if custom_titles is not None:
+            title = custom_titles[0]
+            custom_titles = custom_titles[1:]
+            
+        else:
+            title = f'Conv-{replication_level} modulation'
+            
 
         x_label = None
         # if replication_level_for_axes + 1 == COMPARISON_NROWS:

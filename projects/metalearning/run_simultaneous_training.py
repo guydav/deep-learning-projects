@@ -84,9 +84,9 @@ if __name__ == '__main__':
     test_coreset_size = args.test_coreset_size
     train_coreset_size_per_query = bool(args.coreset_size_per_query)
 
-    if args.maml_meta_test and not args.maml:
-        print('maml_meta_test can only be set to true if maml is. Aborting...')
-        sys.exit(1)
+    # if args.maml_meta_test and not args.maml:
+    #     print('maml_meta_test can only be set to true if maml is. Aborting...')
+    #     sys.exit(1)
 
     query_subset = np.arange(10 * benchmark_dimension, 10 * (benchmark_dimension + 1))
     accuracy_threshold = args.accuracy_threshold

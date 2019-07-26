@@ -38,7 +38,7 @@ parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
 DEFAULT_MAX_EPOCHS = 4000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
 
-DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
+DEFAULT_WANDB_PROJECT = 'simultaneous-training'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 # parser.add_argument('--maml', action='store_true')

@@ -187,7 +187,7 @@ if __name__ == '__main__':
     if len(description) > 0:
         description += '\n'
 
-    description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query subset: {list(query_subset)}'
+    description += f'benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query subset: {list(query_subset)}'
     wandb.run.description = description
     wandb.run.save()
 
@@ -199,8 +199,6 @@ if __name__ == '__main__':
     wandb.config.batch_size = train_dataloader.batch_size
     wandb.config.benchmark_dimension = benchmark_dimension
     wandb.config.dataset_random_seed = dataset_random_seed
-    wandb.config.train_coreset_size = train_coreset_size
-    wandb.config.test_coreset_size = test_coreset_size
     wandb.config.query_subset = [int(x) for x in query_subset]
     wandb.config.accuracy_threshold = accuracy_threshold
     wandb.config.epochs = total_epochs

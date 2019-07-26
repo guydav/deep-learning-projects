@@ -136,7 +136,7 @@ if __name__ == '__main__':
                                    return_indices=args.return_indices,
                                    dataset_class=MetaLearningH5DatasetFromDescription,
                                    dataset_class_kwargs=dict(
-                                       benchmark_dimension=benchmark_dimension,
+                                       # benchmark_dimension=benchmark_dimension,
                                        random_seed=dataset_random_seed,
                                        query_subset=query_subset
                                    ),

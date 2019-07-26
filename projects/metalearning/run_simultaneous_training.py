@@ -137,7 +137,7 @@ if __name__ == '__main__':
                                    dataset_class=MetaLearningH5DatasetFromDescription,
                                    dataset_class_kwargs=dict(
                                        # benchmark_dimension=benchmark_dimension,
-                                       random_seed=dataset_random_seed,
+                                       # random_seed=dataset_random_seed,
                                        query_subset=query_subset
                                    ),
                                    train_dataset_class=train_dataset_class,

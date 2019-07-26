@@ -19,30 +19,10 @@ parser.add_argument('--num_workers', type=int, default=DEFAULT_NUM_WORKERS)
 DEFAULT_PIN_MEMORY = 1
 parser.add_argument('--pin_memory', type=int, default=DEFAULT_PIN_MEMORY)
 
-WILLIAMS_SQUARE_TEN = np.array(
-    [[ 1,  2, 10,  3,  9,  4,  8,  5,  7,  6],
-     [ 2,  3,  1,  4, 10,  5,  9,  6,  8,  7],
-     [ 3,  4,  2,  5,  1,  6, 10,  7,  9,  8],
-     [ 4,  5,  3,  6,  2,  7,  1,  8, 10,  9],
-     [ 5,  6,  4,  7,  3,  8,  2,  9,  1, 10],
-     [ 6,  7,  5,  8,  4,  9,  3, 10,  2,  1],
-     [ 7,  8,  6,  9,  5, 10,  4,  1,  3,  2],
-     [ 8,  9,  7, 10,  6,  1,  5,  2,  4,  3],
-     [ 9, 10,  8,  1,  7,  2,  6,  3,  5,  4],
-     [10,  1,  9,  2,  8,  3,  7,  4,  6,  5]])
-parser.add_argument('--use_latin_square', action='store_true')
-parser.add_argument('--latin_square_random_seed', type=int, default=None)
-parser.add_argument('--latin_square_index', type=int, default=None)
-
 parser.add_argument('--script_random_seed', type=int, default=None)
 parser.add_argument('--benchmark_dimension', type=int, default=None)
 parser.add_argument('--dataset_random_seed', type=int, default=None)
-DEFAULT_TRAIN_CORESET_SIZE = 22500
-parser.add_argument('--train_coreset_size', type=int, default=DEFAULT_TRAIN_CORESET_SIZE)
-DEFAULT_TEST_CORESET_SIZE = 5000
-parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
-parser.add_argument('--coreset_size_per_query', type=int, default=0)
-parser.add_argument('--query_order', default=None)
+
 DEFAULT_ACCURACY_THRESHOLD = 0.95
 parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY_THRESHOLD)
 
@@ -57,18 +37,17 @@ DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
 parser.add_argument('--save_dir', default=DEFAULT_SAVE_DIR)
 DEFAULT_MAX_EPOCHS = 4000
 parser.add_argument('--max_epochs', type=int, default=DEFAULT_MAX_EPOCHS)
-parser.add_argument('--threshold_all_queries', type=int, default=1)
 
 DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
-parser.add_argument('--maml', action='store_true')
-DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
-parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
-parser.add_argument('--return_indices', action='store_true')
-
-parser.add_argument('--balanced_batches', action='store_true')
-parser.add_argument('--maml_meta_test', action='store_true')
+# parser.add_argument('--maml', action='store_true')
+# DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
+# parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
+# parser.add_argument('--return_indices', action='store_true')
+#
+# parser.add_argument('--balanced_batches', action='store_true')
+# parser.add_argument('--maml_meta_test', action='store_true')
 
 parser.add_argument('--debug', action='store_true')
 
@@ -109,65 +88,47 @@ if __name__ == '__main__':
         print('maml_meta_test can only be set to true if maml is. Aborting...')
         sys.exit(1)
 
-    if args.query_order is not None:
-        query_order = np.array([int(x) for x in args.query_order.split(' ')])
-
-    else:
-        if args.use_latin_square:
-            latin_square_random = np.random.RandomState(args.latin_square_random_seed)
-            latin_square = np.copy(WILLIAMS_SQUARE_TEN)
-            latin_square_random.shuffle(latin_square)  # permute rows
-            latin_square_random.shuffle(latin_square.T)  # permute cols
-            query_order = latin_square[args.latin_square_index % latin_square.shape[0]]
-            query_order -= 1
-
-        else:
-            query_order = np.arange(10)
-            np.random.shuffle(query_order)
-
-        query_order += benchmark_dimension * 10
-
+    query_subset = np.arange(10 * benchmark_dimension, 10 * (benchmark_dimension + 1))
     accuracy_threshold = args.accuracy_threshold
 
     save_dir = args.save_dir
     current_epoch = 0
     total_epochs = args.max_epochs
-    threshold_all_queries = bool(args.threshold_all_queries)
 
     train_dataset_class = None
     train_batch_size = None
     train_shuffle = True
-    train_dataset_kwargs = dict(
-        previous_query_coreset_size=train_coreset_size,
-        coreset_size_per_query=train_coreset_size_per_query,
-    )
+    # train_dataset_kwargs = dict(
+    #     previous_query_coreset_size=train_coreset_size,
+    #     coreset_size_per_query=train_coreset_size_per_query,
+    # )
 
     test_dataset_class = None
     test_batch_size = None
     test_shuffle = True
-    test_dataset_kwargs = dict(
-        previous_query_coreset_size=test_coreset_size,
-        coreset_size_per_query=True,
-    )
+    # test_dataset_kwargs = dict(
+    #     previous_query_coreset_size=test_coreset_size,
+    #     coreset_size_per_query=True,
+    # )
 
-    if args.maml:
-        args.balanced_batches = True
-        train_batch_size = batch_size // 2
-        train_dataset_kwargs['batch_size'] = train_batch_size
-
-        if args.maml_meta_test:
-            test_dataset_class = BalancedBatchesMetaLearningDataset
-            test_shuffle = False
-            test_dataset_kwargs['batch_size'] = train_batch_size
-            test_batch_size = train_batch_size
-
-    if args.balanced_batches:
-        print('Using balanced batches')
-        train_dataset_class = BalancedBatchesMetaLearningDataset
-        train_shuffle = False
-
-        if 'batch_size' not in train_dataset_kwargs:
-            train_dataset_kwargs['batch_size'] = batch_size
+    # if args.maml:
+    #     args.balanced_batches = True
+    #     train_batch_size = batch_size // 2
+    #     train_dataset_kwargs['batch_size'] = train_batch_size
+    #
+    #     if args.maml_meta_test:
+    #         test_dataset_class = BalancedBatchesMetaLearningDataset
+    #         test_shuffle = False
+    #         test_dataset_kwargs['batch_size'] = train_batch_size
+    #         test_batch_size = train_batch_size
+    #
+    # if args.balanced_batches:
+    #     print('Using balanced batches')
+    #     train_dataset_class = BalancedBatchesMetaLearningDataset
+    #     train_shuffle = False
+    #
+    #     if 'batch_size' not in train_dataset_kwargs:
+    #         train_dataset_kwargs['batch_size'] = batch_size
 
     normalized_train_dataset, train_dataloader, normalized_test_dataset, test_dataloader = \
         create_normalized_datasets(dataset_path=dataset_path,
@@ -177,16 +138,16 @@ if __name__ == '__main__':
                                    downsample_size=None,
                                    should_flip=False,
                                    return_indices=args.return_indices,
-                                   dataset_class=SequentialBenchmarkMetaLearningDataset,
+                                   dataset_class=MetaLearningH5DatasetFromDescription,
                                    dataset_class_kwargs=dict(
                                        benchmark_dimension=benchmark_dimension,
                                        random_seed=dataset_random_seed,
-                                       query_order=query_order
+                                       query_subset=query_subset
                                    ),
                                    train_dataset_class=train_dataset_class,
-                                   train_dataset_kwargs=train_dataset_kwargs,
+                                   # train_dataset_kwargs=train_dataset_kwargs,
                                    test_dataset_class=test_dataset_class,
-                                   test_dataset_kwargs=test_dataset_kwargs,
+                                   # test_dataset_kwargs=test_dataset_kwargs,
                                    train_shuffle=train_shuffle,
                                    test_shuffle=test_shuffle,
                                    train_batch_size=train_batch_size,
@@ -207,12 +168,12 @@ if __name__ == '__main__':
                         name=f'{args.name}-{dataset_random_seed}',
                         save_dir=save_dir)
 
-    if args.maml:
-        model_kwargs['fast_weight_lr'] = args.fast_weight_learning_rate
-        model = MamlPoolingDropoutCNNMLP(**model_kwargs)
-
-    else:
-        model = PoolingDropoutCNNMLP(**model_kwargs)
+    # if args.maml:
+    #     model_kwargs['fast_weight_lr'] = args.fast_weight_learning_rate
+    #     model = MamlPoolingDropoutCNNMLP(**model_kwargs)
+    #
+    # else:
+    model = PoolingDropoutCNNMLP(**model_kwargs)
 
     model.load_model(current_epoch)
     model = model.cuda()
@@ -230,7 +191,7 @@ if __name__ == '__main__':
     if len(description) > 0:
         description += '\n'
 
-    description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
+    description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query subset: {list(query_subset)}'
     wandb.run.description = description
     wandb.run.save()
 
@@ -244,35 +205,31 @@ if __name__ == '__main__':
     wandb.config.dataset_random_seed = dataset_random_seed
     wandb.config.train_coreset_size = train_coreset_size
     wandb.config.test_coreset_size = test_coreset_size
-    wandb.config.query_order = [int(x) for x in query_order]
+    wandb.config.query_subset = [int(x) for x in query_subset]
     wandb.config.accuracy_threshold = accuracy_threshold
     wandb.config.epochs = total_epochs
 
-    if args.maml:
-        wandb.config.fast_weight_lr = args.fast_weight_learning_rate
-
-    if args.use_latin_square:
-        wandb.config.latin_square_random_seed = args.latin_square_random_seed
-        wandb.config.latin_square_index = args.latin_square_index
+    # if args.maml:
+    #     wandb.config.fast_weight_lr = args.fast_weight_learning_rate
+    #
+    # if args.use_latin_square:
+    #     wandb.config.latin_square_random_seed = args.latin_square_random_seed
+    #     wandb.config.latin_square_index = args.latin_square_index
 
     if args.debug: print('After wandb init')
 
     train_epoch_func = train_epoch
     test_epoch_func = test
 
-    if args.maml:
-        train_epoch_func = maml_train_epoch
+    # if args.maml:
+    #     train_epoch_func = maml_train_epoch
+    #
+    #     if args.maml_meta_test:
+    #         test_epoch_func = maml_test_epoch
 
-        if args.maml_meta_test:
-            test_epoch_func = maml_test_epoch
+    if args.debug: print('Calling simultaneous training')
 
-    if args.debug: print('Calling sequential benchmark')
-
-    sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold,
-                         threshold_all_queries=threshold_all_queries,
-                         num_epochs=total_epochs - current_epoch,
-                         epochs_to_graph=total_epochs + 1,
-                         start_epoch=current_epoch,
-                         debug=args.debug,
-                         save_name=f'{args.name}-{dataset_random_seed}',
-                         train_epoch_func=train_epoch_func, test_epoch_func=test_epoch_func)
+    simultaneous_training(model, train_dataloader, test_dataloader, accuracy_threshold,
+                          num_epochs=total_epochs - current_epoch, start_epoch=current_epoch,
+                          watch=True, debug=args.debug, save_name=f'{args.name}-{dataset_random_seed}',
+                          train_epoch_func=train_epoch_func, test_epoch_func=test_epoch_func)

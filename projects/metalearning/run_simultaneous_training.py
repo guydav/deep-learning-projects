@@ -80,10 +80,6 @@ if __name__ == '__main__':
     torch.manual_seed(dataset_random_seed)
     torch.cuda.manual_seed_all(dataset_random_seed)
 
-    train_coreset_size = args.train_coreset_size
-    test_coreset_size = args.test_coreset_size
-    train_coreset_size_per_query = bool(args.coreset_size_per_query)
-
     # if args.maml_meta_test and not args.maml:
     #     print('maml_meta_test can only be set to true if maml is. Aborting...')
     #     sys.exit(1)

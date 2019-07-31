@@ -69,7 +69,8 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
                         log_x=False, shade_error=False, sem_n=1, ylim=None,
                         font_dict=None, x_label=None, y_label=None, y_label_right=False, 
                         title=None, hline_y=None, hline_style=None, title_font_dict=None, 
-                        custom_x_ticks=None, text=None, text_x=None, text_y=None, num_tasks_to_plot=None):
+                        custom_x_ticks=None, text=None, text_x=None, text_y=None, 
+                        num_tasks_to_plot=None, plot_consecutive=False):
     if font_dict is None:
         font_dict = {}
         
@@ -82,10 +83,17 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
         num_points = results.mean.shape[0]
     else:
         num_points = num_tasks_to_plot
-      
+    
+    start_x_value = 0
+    
     for row in range(num_points):
         max_x = np.argmax(np.isnan(results.mean[row, :]))
         x_values = np.arange(1, max_x + 1) * epochs_to_training_examples(row)
+        
+        if plot_consecutive and max_x > 0:
+            x_values = x_values + start_x_value
+            start_x_value = x_values[-1]
+        
         y_means = results.mean[row, :max_x]
         
         ax.plot(x_values, y_means, color=colors(row / num_colors))
@@ -148,7 +156,8 @@ def raw_accuracies_plot(ax, results, colors, epochs_to_training_examples,
 
     
 def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, dimension_index=COMBINED_INDEX,
-                            shade_error=False, font_dict=None, hline_y=None, hline_style=None, num_tasks_to_plot=None,
+                            shade_error=False, font_dict=None, hline_y=None, hline_style=None, 
+                            num_tasks_to_plot=None, plot_consecutive=False,
                             first_task_title='First task accuracy by times trained',
                             new_task_title='New task accuracy by task order',
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
@@ -178,7 +187,6 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
         
     if isinstance(new_task_colormap, str):
         new_task_colormap = plt.get_cmap(new_task_colormap)
-
         
     if external_axes is not None:
         new_task_ax = external_axes[0]
@@ -199,7 +207,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
                         custom_x_ticks=generate_custom_ticks(4000, 10, 2), text=new_task_text, 
-                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot)
+                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
     
     if external_axes is not None:
         first_task_ax = external_axes[1]
@@ -220,7 +228,7 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                         font_dict=font_dict, x_label=x_label, y_label=y_label,
                         title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
                         custom_x_ticks=generate_custom_ticks(), text=first_task_text, 
-                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot)
+                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
         
     if add_colorbars:
         add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
@@ -617,13 +625,14 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         if ax_index == 0:
             y_label = plot_y_label
         
-        examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
-                                     log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                     font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
-                                     plot_regression=plot_regression, regression_legend=regression_legend,
-                                     mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark, 
-                                     num_tasks_to_plot=num_tasks_to_plot)
+        if num_times_trained_ax is not None:
+            examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
+                                         log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
+                                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                         title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
+                                         plot_regression=plot_regression, regression_legend=regression_legend,
+                                         mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark, 
+                                         num_tasks_to_plot=num_tasks_to_plot)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[2 * ax_index + 1]
@@ -634,13 +643,14 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         # y_label = dimension_name.capitalize()
         title = num_tasks_trained_title
         
-        examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
-                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label,
-                                      highlight_first_time=num_tasks_trained_highlight_first_time,
-                                      title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
-                                      plot_regression=plot_regression, regression_legend=regression_legend,
-                                      num_tasks_to_plot=num_tasks_to_plot)
+        if num_tasks_trained_ax is not None:
+            examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
+                                          log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
+                                          font_dict=font_dict, x_label=x_label, y_label=y_label,
+                                          highlight_first_time=num_tasks_trained_highlight_first_time,
+                                          title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
+                                          plot_regression=plot_regression, regression_legend=regression_legend,
+                                          num_tasks_to_plot=num_tasks_to_plot)
         
         if (ax_index == len(dimension_names) - 1) and add_colorbars:
             add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
@@ -998,12 +1008,13 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         x_label = ''
         y_label = plot_y_label
 
-        examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
-                                     log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
-                                     font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     y_custom_tick_labels=y_custom_tick_labels,
-                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                     title_font_dict=title_font_dict)
+        if num_times_trained_ax is not None:
+            examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
+                                         log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
+                                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                         y_custom_tick_labels=y_custom_tick_labels,
+                                         title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                         title_font_dict=title_font_dict)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[1]
@@ -1011,12 +1022,13 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
             num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, COMPARISON_NCOLS + 1)
         y_label = f'No query\nmodulation'
 
-        examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
-                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
-                                      y_custom_tick_labels=y_custom_tick_labels,
-                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                      title_font_dict=title_font_dict)
+        if num_tasks_trained_ax is not None:
+            examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
+                                          log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
+                                          font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
+                                          y_custom_tick_labels=y_custom_tick_labels,
+                                          title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                          title_font_dict=title_font_dict)
     
     # plot per query
     if replication_levels == None:
@@ -1069,12 +1081,13 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         if replication_level_for_axes == 0:
             y_label = plot_y_label
 
-        examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
-                                     log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
-                                     font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                     y_custom_tick_labels=y_custom_tick_labels,
-                                     title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                     title_font_dict=title_font_dict)
+        if num_times_trained_ax is not None:
+            examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
+                                         log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
+                                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                                         y_custom_tick_labels=y_custom_tick_labels,
+                                         title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                         title_font_dict=title_font_dict)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[1]
@@ -1084,18 +1097,21 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         title = ''
         # y_label = f'Query modulation\nat conv-{replication_level}'
 
-        examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
-                                      log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
-                                      font_dict=font_dict, x_label=x_label, y_label=y_label,
-                                      y_custom_tick_labels=y_custom_tick_labels,
-                                      title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                      title_font_dict=title_font_dict)
+        if num_tasks_trained_ax is not None:
+            examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
+                                          log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
+                                          font_dict=font_dict, x_label=x_label, y_label=y_label,
+                                          y_custom_tick_labels=y_custom_tick_labels,
+                                          title=title, hline_y=null_hline_y, hline_style=null_hline_style,
+                                          title_font_dict=title_font_dict)
         
         if (replication_level_for_axes == len(per_query_replication) - 1) and add_colorbars:
-            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
-                                 y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
-            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
-                                 y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
+            if num_times_trained_ax is not None:
+                add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
+                                     y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
+            if num_tasks_trained_ax is not None:
+                add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
+                                     y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
     
     if external_axes is None:
         save(save_path)

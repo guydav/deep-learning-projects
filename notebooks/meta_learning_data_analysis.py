@@ -325,6 +325,53 @@ def parse_total_task_training_curve(current_run_id=None, current_run=None, sampl
     return total_task_curve
 
 
+def parse_simultaneous_training(current_run_id=None, current_run=None, samples=MAX_HISTORY_SAMPLES):
+    if current_run_id is None and current_run is None:
+        print('Must provide either a current run or its id')
+        return
+    
+    if current_run is None:
+        current_run = API.run(f'meta-learning-scaling/sequential-benchmark-baseline/{current_run_id}')
+        
+    current_df = current_run.history(pandas=True, samples=samples)
+    simultaneous_task_accuracies = current_df['Test Per-Query Accuracy (list)']
+    first_row_blank = int(np.isnan(simultaneous_task_accuracies[0]))
+    return np.array(list(simultaneous_task_accuracies[first_row_blank:]))
+
+
+def process_multiple_runs_simultaneous_training(runs, debug=False, ignore_runs=None, samples=MAX_HISTORY_SAMPLES):
+    simultaneous_training_results = []
+    
+    for i, run in enumerate(runs):
+        if i > 0 and i % 10 == 0:
+            print(run.name, i)
+        else:
+            print(run.name)
+        
+        if ignore_runs is not None and run.name in ignore_runs:
+            continue
+        
+        simultaneous_training_results.append(parse_simultaneous_training(current_run=run, samples=samples))
+        
+    max_length = max([res.shape[0] for res in simultaneous_training_results])
+    for i in range(len(simultaneous_training_results)):
+        curr_length = simultaneous_training_results[i].shape[0]
+        simultaneous_training_results[i] = np.pad(simultaneous_training_results[i], ((0, max_length - curr_length), (0, 0)), 
+                                                  'constant', constant_values=np.nan)        
+    
+    stacked_results = np.stack(simultaneous_training_results, axis=2)      
+    
+    all_results_mean = np.nanmean(stacked_results, axis=(1, 2))
+    all_results_std = np.nanstd(stacked_results, axis=(1, 2))
+    all_results_sem = all_results_std / np.sqrt(np.prod(stacked_results.shape[1:]))
+    
+    per_task_results_mean = np.nanmean(stacked_results, axis=(2))
+    per_task_results_std = np.nanstd(stacked_results, axis=(2))
+    per_task_results_sem = per_task_results_std / np.sqrt(stacked_results.shape[2])
+    
+    return stacked_results, all_results_mean, all_results_std, all_results_sem, per_task_results_mean, per_task_results_std, per_task_results_sem
+    
+
 PRINT_HEADERS = ['###'] + [str(x) for x in range(1, 11)]
 
 

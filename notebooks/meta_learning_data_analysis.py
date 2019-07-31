@@ -357,7 +357,7 @@ def process_multiple_runs_simultaneous_training(runs, debug=False, ignore_runs=N
     for i in range(len(simultaneous_training_results)):
         curr_length = simultaneous_training_results[i].shape[0]
         simultaneous_training_results[i] = np.pad(simultaneous_training_results[i], ((0, max_length - curr_length), (0, 0)), 
-                                                  'constant', constant_values=np.nan)        
+                                                  'edge') #'constant', constant_values=np.nan)        
     
     stacked_results = np.stack(simultaneous_training_results, axis=2)      
     

@@ -161,7 +161,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                             first_task_title='First task accuracy by times trained',
                             new_task_title='New task accuracy by task order',
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
-                            new_task_text=None, first_task_text=None, text_x=None, text_y=None,
+                            new_task_text=None, first_task_text=None, text_x=None, text_y=None, 
+                            y_labels=('New task accuracy', 'First task accuracy'),
                             title_font_dict=None, add_colorbars=True, save_path=None, external_axes=None):
     NROWS = 2
     NCOLS = 1
@@ -197,17 +198,18 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     results = result_set[dimension_index].new_task_accuracies
     title = new_task_title
     x_label = None
-    y_label = 'New task accuracy'
+    y_label = y_labels[0]
         
     def new_task_epochs_to_training_examples(rep):
         return DATASET_CORESET_SIZE
     
-    raw_accuracies_plot(new_task_ax, results, new_task_colormap, new_task_epochs_to_training_examples, 
-                        log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
-                        font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
-                        custom_x_ticks=generate_custom_ticks(4000, 10, 2), text=new_task_text, 
-                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
+    if new_task_ax is not None:
+        raw_accuracies_plot(new_task_ax, results, new_task_colormap, new_task_epochs_to_training_examples, 
+                            log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
+                            font_dict=font_dict, x_label=x_label, y_label=y_label, 
+                            title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
+                            custom_x_ticks=generate_custom_ticks(4000, 10, 2), text=new_task_text, 
+                            text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
     
     if external_axes is not None:
         first_task_ax = external_axes[1]
@@ -218,23 +220,26 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     results = result_set[dimension_index].first_task_accuracies
     title = first_task_title
     x_label = None
-    y_label = 'First task accuracy'
+    y_label = y_labels[1]
     
     def first_task_epochs_to_training_examples(row):
         return examples_per_epoch(1, row + 1)
         
-    raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
-                        log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
-                        font_dict=font_dict, x_label=x_label, y_label=y_label,
-                        title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
-                        custom_x_ticks=generate_custom_ticks(), text=first_task_text, 
-                        text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
+    if first_task_ax is not None:
+        raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
+                            log_x=log_x, shade_error=shade_error, sem_n=result_set[dimension_index].accuracy_counts,
+                            font_dict=font_dict, x_label=x_label, y_label=y_label,
+                            title=title, hline_y=hline_y, hline_style=hline_style, title_font_dict=title_font_dict,
+                            custom_x_ticks=generate_custom_ticks(), text=first_task_text, 
+                            text_x=text_x, text_y=text_y, num_tasks_to_plot=num_tasks_to_plot, plot_consecutive=plot_consecutive)
         
     if add_colorbars:
-        add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
-                             y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
-        add_colorbar_to_axes(new_task_ax, new_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
-                             y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
+        if first_task_ax is not None:
+            add_colorbar_to_axes(first_task_ax, first_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
+                                 y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
+        if new_task_ax is not None:
+            add_colorbar_to_axes(new_task_ax, new_task_colormap, vmax=result_set[dimension_index].first_task_accuracies.mean.shape[0],
+                                 y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
 
     if external_axes is None:
         if isinstance(save_path, list) or isinstance(save_path, tuple) and len(save_path) == len(axes):

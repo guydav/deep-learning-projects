@@ -163,7 +163,8 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
                             first_task_colormap=DEFAULT_COLORMAP, new_task_colormap=DEFAULT_COLORMAP, 
                             new_task_text=None, first_task_text=None, text_x=None, text_y=None, 
                             y_labels=('New task accuracy', 'First task accuracy'),
-                            title_font_dict=None, add_colorbars=True, save_path=None, external_axes=None):
+                            title_font_dict=None, add_colorbars=True, save_path=None, external_axes=None,
+                            new_task_epochs_to_training_examples=None, first_task_epochs_to_training_examples=None):
     NROWS = 2
     NCOLS = 1
     COL_WIDTH = 6
@@ -199,9 +200,10 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     title = new_task_title
     x_label = None
     y_label = y_labels[0]
-        
-    def new_task_epochs_to_training_examples(rep):
-        return DATASET_CORESET_SIZE
+    
+    if new_task_epochs_to_training_examples is None:
+        def new_task_epochs_to_training_examples(rep):
+            return DATASET_CORESET_SIZE
     
     if new_task_ax is not None:
         raw_accuracies_plot(new_task_ax, results, new_task_colormap, new_task_epochs_to_training_examples, 
@@ -222,8 +224,9 @@ def both_raw_accuracy_plots(result_set, title, ylim=None, log_x=False, sem_n=1, 
     x_label = None
     y_label = y_labels[1]
     
-    def first_task_epochs_to_training_examples(row):
-        return examples_per_epoch(1, row + 1)
+    if first_task_epochs_to_training_examples is None:
+        def first_task_epochs_to_training_examples(row):
+            return examples_per_epoch(1, row + 1)
         
     if first_task_ax is not None:
         raw_accuracies_plot(first_task_ax, results, first_task_colormap, first_task_epochs_to_training_examples, 
@@ -499,7 +502,7 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     if log_x:
         ax.set_xscale("log", nonposx='clip')
     
-    ax.set_xticks(np.arange(num_points) + 1)
+    ax.set_xticks(np.arange(results.mean.shape[0]) + 1)
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
         
     if log_y:
@@ -571,6 +574,7 @@ SUBFIGURE_TEXT_POSITION = {
 
 def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=None, log_x=False, log_y=None,
                                           sem_n=1, shade_error=False, font_dict=None, plot_y_label=DEFAULT_Y_LABEL,
+                                          times_trained_y_label=None, tasks_trained_y_label=None,
                                           times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
                                           log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
                                           dimension_names=CONDITION_ANALYSES_FIELDS, 
@@ -579,7 +583,8 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                           add_subfigure_texts=False, add_colorbars=True,
                                           save_path=None, external_axes=None, num_times_trained_title='',
                                           num_tasks_trained_title='', plot_regression=False, regression_legend=False,
-                                          mark_lines=None, num_lines_to_mark=0, num_tasks_to_plot=None):
+                                          mark_lines=None, num_lines_to_mark=0, 
+                                          num_tasks_to_plot_times_trained=None, num_tasks_to_plot_tasks_trained=None):
     NROWS = 2
     NCOLS = len(dimension_names)
     COL_WIDTH = 6.5
@@ -612,6 +617,12 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
     if isinstance(tasks_trained_colormap, str):
         tasks_trained_colormap = plt.get_cmap(tasks_trained_colormap)
         
+    if times_trained_y_label is None:
+        times_trained_y_label = plot_y_label
+        
+    if tasks_trained_y_label is None:
+        tasks_trained_y_label = plot_y_label
+        
     for ax_index, (dimension_index, dimension_name) in enumerate(zip(dimension_indices, dimension_names)):
         if external_axes is not None:
             num_times_trained_ax = external_axes[2 * ax_index]
@@ -628,7 +639,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         x_label = None
         y_label = ''
         if ax_index == 0:
-            y_label = plot_y_label
+            y_label = times_trained_y_label
         
         if num_times_trained_ax is not None:
             examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colormap, ylim=ylim, 
@@ -637,7 +648,7 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
                                          title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
                                          plot_regression=plot_regression, regression_legend=regression_legend,
                                          mark_lines=mark_lines, num_lines_to_mark=num_lines_to_mark, 
-                                         num_tasks_to_plot=num_tasks_to_plot)
+                                         num_tasks_to_plot=num_tasks_to_plot_times_trained)
 
         if external_axes is not None:
             num_tasks_trained_ax = external_axes[2 * ax_index + 1]
@@ -651,16 +662,18 @@ def plot_processed_results_all_dimensions(result_set, data_index, title, ylim=No
         if num_tasks_trained_ax is not None:
             examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colormap, ylim=ylim, 
                                           log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n[dimension_index],
-                                          font_dict=font_dict, x_label=x_label, y_label=y_label,
+                                          font_dict=font_dict, x_label=x_label, y_label=tasks_trained_y_label,
                                           highlight_first_time=num_tasks_trained_highlight_first_time,
                                           title=title, log_y_custom_ticks=log_y_custom_ticks, title_font_dict=title_font_dict,
                                           plot_regression=plot_regression, regression_legend=regression_legend,
-                                          num_tasks_to_plot=num_tasks_to_plot)
+                                          num_tasks_to_plot=num_tasks_to_plot_tasks_trained)
         
         if (ax_index == len(dimension_names) - 1) and add_colorbars:
-            add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
+            if num_times_trained_ax is not None:
+                add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
                                  y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)
-            add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
+            if num_tasks_trained_ax is not None:
+                add_colorbar_to_axes(num_tasks_trained_ax, tasks_trained_colormap, vmax=result_set[dimension_indices[-1]][data_index].mean.shape[0],
                                  y_label=NUM_TIMES_TRAINED_LABEL, y_label_font_dict=font_dict)
 
     if add_subfigure_texts:
@@ -1110,7 +1123,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
                                           title=title, hline_y=null_hline_y, hline_style=null_hline_style,
                                           title_font_dict=title_font_dict)
         
-        if (replication_level_for_axes == len(per_query_replication) - 1) and add_colorbars:
+        if (replication_level_for_axes == len(replication_levels) - 1) and add_colorbars:
             if num_times_trained_ax is not None:
                 add_colorbar_to_axes(num_times_trained_ax, times_trained_colormap, vmax=baseline[3][data_index].mean.shape[0],
                                      y_label=ORDINAL_POSITION_LABEL, y_label_font_dict=font_dict)

@@ -298,7 +298,6 @@ class PoolingDropoutCNNMLP(CNNMLPMixIn, BasicModel):
         self.lr_scheduler_patience = lr_scheduler_patience
 
 
-
 class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
     """
     A query-modulating convolutional model. Receives the query as well, passes tit hrough a single
@@ -373,6 +372,78 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
         return x
 
 
+class TaskOutputConditionalPoolingDropoutConvInputModel(nn.Module):
+    """
+    Unlike the above, this modulates after the activation function, and multiplicatively.
+    """
+    def __init__(self, mod_level, query_length=30, filter_sizes=(16, 24, 32, 40),
+                 dropout=True, p_dropout=0.2):
+        super(TaskOutputConditionalPoolingDropoutConvInputModel, self).__init__()
+
+        if mod_level < 0 or mod_level > 4:
+            raise ValueError('Query modulation level should be between 0 and 4 inclusive')
+
+        self.mod_level = mod_level
+        self.query_mod_layer = nn.Linear(query_length, filter_sizes[self.mod_level - 1])
+
+        self.conv1 = nn.Conv2d(3, filter_sizes[0], 3, stride=1, padding=1)
+        self.batchNorm1 = nn.BatchNorm2d(filter_sizes[0])
+        self.conv2 = nn.Conv2d(filter_sizes[0], filter_sizes[1], 3, stride=1, padding=1)
+        self.batchNorm2 = nn.BatchNorm2d(filter_sizes[1])
+        self.conv3 = nn.Conv2d(filter_sizes[1], filter_sizes[2], 3, stride=1, padding=1)
+        self.batchNorm3 = nn.BatchNorm2d(filter_sizes[2])
+        self.conv4 = nn.Conv2d(filter_sizes[2], filter_sizes[3], 3, stride=1, padding=1)
+        self.batchNorm4 = nn.BatchNorm2d(filter_sizes[3])
+
+        self.dropout = dropout
+        self.p_dropout = p_dropout
+
+    def forward(self, img, query):
+        # adding two fake dimensions for the spatial ones => [b, c, w, h]
+        # checking for > 0 such that mod_level = 0 is the baseline model
+        if self.mod_level > 0:
+            query_mod = F.sigmoid(self.query_mod_layer(query)[:, :, None, None])
+
+        """convolution"""
+        x = self.conv1(img)
+        if self.mod_level == 1:
+            x = x * query_mod
+        x = F.relu(x)
+        x = self.batchNorm1(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv2(x)
+        if self.mod_level == 2:
+            x = x * query_mod
+        x = F.relu(x)
+        x = self.batchNorm2(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv3(x)
+        if self.mod_level == 3:
+            x = x * query_mod
+        x = F.relu(x)
+        x = self.batchNorm3(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        x = self.conv4(x)
+        if self.mod_level == 4:
+            x = x * query_mod
+        x = F.relu(x)
+        x = self.batchNorm4(x)
+        x = F.max_pool2d(x, 2)
+        if self.dropout:
+            x = F.dropout2d(x, self.p_dropout, self.training)
+
+        return x
+
+
 class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
     """
     A full model using the query-modulating convolutional model; see documentation above.m
@@ -397,6 +468,47 @@ class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
         return QueryModulatingPoolingDropoutConvInputModel(self.mod_level, self.query_length,
                                                           conv_filter_sizes, conv_dropout, conv_p_dropout)
+
+    def forward(self, img, query):
+        x = self.conv(img, query)  # adding the query to be modulated
+        # x = (16 x 24 x 15 x 20)
+        """fully connected layers"""
+        x = x.view(x.size(0), -1)
+
+        x_ = x
+        if self.query_length > 0:
+            x_ = torch.cat((x_, query), 1)  # Concat query - as a float?
+
+        x_ = self.fc1(x_)
+        x_ = F.relu(x_)
+
+        return self.fcout(x_)
+
+
+class TaskOutputConditionalCNNMLP(PoolingDropoutCNNMLP):
+    """
+    A full model using the query-modulating convolutional model; see documentation above.m
+    """
+    def __init__(self, mod_level, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
+                 conv_dropout=True, conv_p_dropout=0.2,
+                 mlp_layer_sizes=(256, 256, 256, 256),
+                 mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
+                 conv_output_size=1920, lr=1e-4, weight_decay=0, num_classes=2,
+                 use_mse=False, loss=None, compute_correct_rank=False,
+                 name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
+
+        self.mod_level = mod_level
+
+        super(TaskOutputConditionalCNNMLP, self).__init__(
+            query_length, conv_filter_sizes, conv_dropout, conv_p_dropout,
+            mlp_layer_sizes, mlp_dropout, mlp_p_dropout, use_lr_scheduler, lr_scheduler_patience,
+            conv_output_size, lr, weight_decay, num_classes, use_mse, loss,
+            compute_correct_rank, name, save_dir
+        )
+
+    def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
+        return TaskOutputConditionalPoolingDropoutConvInputModel(self.mod_level, self.query_length,
+                                                                 conv_filter_sizes, conv_dropout, conv_p_dropout)
 
     def forward(self, img, query):
         x = self.conv(img, query)  # adding the query to be modulated

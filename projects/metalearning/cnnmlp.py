@@ -372,74 +372,70 @@ class QueryModulatingPoolingDropoutConvInputModel(nn.Module):
         return x
 
 
-class TaskOutputConditionalPoolingDropoutConvInputModel(nn.Module):
+class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
     """
     Unlike the above, this modulates after the activation function, and multiplicatively.
     """
-    def __init__(self, mod_level, query_length=30, filter_sizes=(16, 24, 32, 40),
+    def __init__(self, layers_modulated=None, multiplicative_mod=True, additive_mod=True,
+                 query_length=30, conv_channels_per_layer=(16, 24, 32, 40),
                  dropout=True, p_dropout=0.2):
-        super(TaskOutputConditionalPoolingDropoutConvInputModel, self).__init__()
+        super(TaskConditionalPoolingDropoutConvInputModel, self).__init__()
 
-        if mod_level < 0 or mod_level > 4:
-            raise ValueError('Query modulation level should be between 0 and 4 inclusive')
+        if layers_modulated is None:
+            layers_modulated = list(range(4))
 
-        self.mod_level = mod_level
-        self.query_mod_layer = nn.Linear(query_length, filter_sizes[self.mod_level - 1])
+        elif not (np.all(np.array(layers_modulated) > 0) and np.all(np.array(layers_modulated) < 4)):
+            raise ValueError('Query modulation levels should be between 0 and 3 inclusive')
 
-        self.conv1 = nn.Conv2d(3, filter_sizes[0], 3, stride=1, padding=1)
-        self.batchNorm1 = nn.BatchNorm2d(filter_sizes[0])
-        self.conv2 = nn.Conv2d(filter_sizes[0], filter_sizes[1], 3, stride=1, padding=1)
-        self.batchNorm2 = nn.BatchNorm2d(filter_sizes[1])
-        self.conv3 = nn.Conv2d(filter_sizes[1], filter_sizes[2], 3, stride=1, padding=1)
-        self.batchNorm3 = nn.BatchNorm2d(filter_sizes[2])
-        self.conv4 = nn.Conv2d(filter_sizes[2], filter_sizes[3], 3, stride=1, padding=1)
-        self.batchNorm4 = nn.BatchNorm2d(filter_sizes[3])
+        self.input_channels_per_layer = [3] + conv_channels_per_layer
+        self.layers_modulated = layers_modulated
+
+        self.multiplicative_mod = multiplicative_mod
+        if self.multiplicative_mod:
+            # TODO: consider how we want to initialize this
+            self.multiplicative_mod_layers = {layer_index: nn.Linear(query_length,
+                                                                     self.input_channels_per_layer[layer_index])
+                                              for layer_index in self.layers_modulated}
+
+        self.additive_mod = additive_mod
+        if self.additive_mod:
+            # TODO: consider how we want to initialize this
+            self.additive_mod_layers = {layer_index: nn.Linear(query_length,
+                                                               self.input_channels_per_layer[layer_index])
+                                        for layer_index in self.layers_modulated}
+
+        self.conv1 = nn.Conv2d(3, conv_channels_per_layer[0], 3, stride=1, padding=1)
+        self.batchNorm1 = nn.BatchNorm2d(conv_channels_per_layer[0])
+        self.conv2 = nn.Conv2d(conv_channels_per_layer[0], conv_channels_per_layer[1], 3, stride=1, padding=1)
+        self.batchNorm2 = nn.BatchNorm2d(conv_channels_per_layer[1])
+        self.conv3 = nn.Conv2d(conv_channels_per_layer[1], conv_channels_per_layer[2], 3, stride=1, padding=1)
+        self.batchNorm3 = nn.BatchNorm2d(conv_channels_per_layer[2])
+        self.conv4 = nn.Conv2d(conv_channels_per_layer[2], conv_channels_per_layer[3], 3, stride=1, padding=1)
+        self.batchNorm4 = nn.BatchNorm2d(conv_channels_per_layer[3])
+
+        self.conv_layers = [self.conv1, self.conv2, self.conv3, self.conv4]
+        self.batch_norm_layers = [self.batchNorm1, self.batchNorm2, self.batchNorm3, self.batchNorm4]
 
         self.dropout = dropout
         self.p_dropout = p_dropout
 
-    def forward(self, img, query):
-        # adding two fake dimensions for the spatial ones => [b, c, w, h]
-        # checking for > 0 such that mod_level = 0 is the baseline model
-        if self.mod_level > 0:
-            query_mod = F.sigmoid(self.query_mod_layer(query)[:, :, None, None])
+    def forward(self, img, task):
+        x = img
 
-        """convolution"""
-        x = self.conv1(img)
-        if self.mod_level == 1:
-            x = x * query_mod
-        x = F.relu(x)
-        x = self.batchNorm1(x)
-        x = F.max_pool2d(x, 2)
-        if self.dropout:
-            x = F.dropout2d(x, self.p_dropout, self.training)
+        for layer_index in range(len(self.conv_layers)):
+            if self.multiplicative_mod and layer_index in self.layers_modulated:
+                # adding two fake dimensions for the spatial ones => [b, c, w, h]
+                x = x * F.sigmoid(self.multiplicative_mod_layers[layer_index](task)[:, :, None, None])
 
-        x = self.conv2(x)
-        if self.mod_level == 2:
-            x = x * query_mod
-        x = F.relu(x)
-        x = self.batchNorm2(x)
-        x = F.max_pool2d(x, 2)
-        if self.dropout:
-            x = F.dropout2d(x, self.p_dropout, self.training)
+            if self.additive_mod and layer_index in self.layers_modulated:
+                # adding two fake dimensions for the spatial ones => [b, c, w, h]
+                x = x + self.additive_mod_layers[layer_index](task)[:, :, None, None]
 
-        x = self.conv3(x)
-        if self.mod_level == 3:
-            x = x * query_mod
-        x = F.relu(x)
-        x = self.batchNorm3(x)
-        x = F.max_pool2d(x, 2)
-        if self.dropout:
-            x = F.dropout2d(x, self.p_dropout, self.training)
-
-        x = self.conv4(x)
-        if self.mod_level == 4:
-            x = x * query_mod
-        x = F.relu(x)
-        x = self.batchNorm4(x)
-        x = F.max_pool2d(x, 2)
-        if self.dropout:
-            x = F.dropout2d(x, self.p_dropout, self.training)
+            x = F.relu(self.conv_layers[layer_index](x))
+            x = self.batch_norm_layers[layer_index](x)
+            x = F.max_pool2d(x, 2)
+            if self.dropout:
+                x = F.dropout2d(x, self.p_dropout, self.training)
 
         return x
 
@@ -507,8 +503,8 @@ class TaskOutputConditionalCNNMLP(PoolingDropoutCNNMLP):
         )
 
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
-        return TaskOutputConditionalPoolingDropoutConvInputModel(self.mod_level, self.query_length,
-                                                                 conv_filter_sizes, conv_dropout, conv_p_dropout)
+        return TaskConditionalPoolingDropoutConvInputModel(self.mod_level, self.query_length,
+                                                           conv_filter_sizes, conv_dropout, conv_p_dropout)
 
     def forward(self, img, query):
         x = self.conv(img, query)  # adding the query to be modulated

@@ -430,7 +430,7 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         for layer_index in range(len(self.conv_layers)):
             if self.multiplicative_mod and layer_index in self.layers_modulated:
                 # adding two fake dimensions for the spatial ones => [b, c, w, h]
-                x = x * F.sigmoid(self.multiplicative_mod_layers[self._get_layer_name('multiplicative', layer_index)](task)[:, :, None, None])
+                x = x * torch.sigmoid(self.multiplicative_mod_layers[self._get_layer_name('multiplicative', layer_index)](task)[:, :, None, None])
 
             if self.additive_mod and layer_index in self.layers_modulated:
                 # adding two fake dimensions for the spatial ones => [b, c, w, h]

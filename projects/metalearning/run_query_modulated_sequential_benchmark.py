@@ -53,6 +53,9 @@ parser.add_argument('--weight_decay', type=float, default=DEFAULT_WEIGHT_DECAY)
 
 parser.add_argument('--modulation_level', type=int, choices=range(1, 5), metavar='[1-4]')
 
+parser.add_argument('--task-conditional', action='store_true')
+parser.add_argument('--task-conditional-modulation-levels', default=None)
+
 parser.add_argument('--name')
 parser.add_argument('--description', default='')
 DEFAULT_SAVE_DIR = '/home/cc/checkpoints'
@@ -151,25 +154,43 @@ if __name__ == '__main__':
     learning_rate = args.learning_rate
     weight_decay = args.weight_decay
 
-    query_modulating_sequential_benchmark_test_model = QueryModulatingCNNMLP(
-        mod_level=mod_level,
-        query_length=30,
-        conv_filter_sizes=(16, 32, 48, 64),
-        conv_output_size=4480,
-        mlp_layer_sizes=(512, 512, 512, 512),
-        lr=learning_rate,
-        weight_decay=weight_decay,
-        use_lr_scheduler=False,
-        conv_dropout=False,
-        mlp_dropout=False,
-        name=f'{args.name}-{mod_level}-{dataset_random_seed}',
-        save_dir=save_dir)
+    if not args.task_conditional:
+        model = QueryModulatingCNNMLP(
+            mod_level=mod_level,
+            query_length=30,
+            conv_filter_sizes=(16, 32, 48, 64),
+            conv_output_size=4480,
+            mlp_layer_sizes=(512, 512, 512, 512),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            use_lr_scheduler=False,
+            conv_dropout=False,
+            mlp_dropout=False,
+            name=f'{args.name}-{mod_level}-{dataset_random_seed}',
+            save_dir=save_dir)
 
-    query_modulating_sequential_benchmark_test_model.load_model(current_epoch)
-    query_modulating_sequential_benchmark_test_model = query_modulating_sequential_benchmark_test_model.cuda()
+    else:
+        mod_level = list(range(4))
+        if args.task_conditional_modulation_level is not None:
+            mod_level = [int(x.strip()) for x in args.task_conditional_modulation_level.split(',')]
 
-    # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
-    # os.environ['WANDB_RESUME'] = 'must'
+        model = TaskConditionalCNNMLP(
+            mod_level=mod_level,
+            query_length=30,
+            conv_filter_sizes=(16, 32, 48, 64),
+            conv_output_size=4480,
+            mlp_layer_sizes=(512, 512, 512, 512),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            use_lr_scheduler=False,
+            conv_dropout=False,
+            mlp_dropout=False,
+            name=f'{args.name}-{mod_level}-{dataset_random_seed}',
+            save_dir=save_dir)
+
+    model.load_model(current_epoch)
+    model = model.cuda()
+
     wandb.init(entity='meta-learning-scaling', project=args.wandb_project,
                name=f'{args.name}-{mod_level}-{dataset_random_seed}')
 
@@ -181,7 +202,7 @@ if __name__ == '__main__':
     wandb.run.description = description
     wandb.run.save()
 
-    current_model = query_modulating_sequential_benchmark_test_model
+    current_model = model
 
     wandb.config.lr = current_model.lr
     wandb.config.decay = current_model.weight_decay
@@ -194,12 +215,13 @@ if __name__ == '__main__':
     wandb.config.query_order = [int(x) for x in query_order]
     wandb.config.accuracy_threshold = accuracy_threshold
     wandb.config.epochs = total_epochs
+    wandb.config.mod_level = mod_level
 
     if args.use_latin_square:
         wandb.config.latin_square_random_seed = args.latin_square_random_seed
         wandb.config.latin_square_index = args.latin_square_index
 
-    sequential_benchmark(query_modulating_sequential_benchmark_test_model, train_dataloader, test_dataloader, accuracy_threshold,
+    sequential_benchmark(model, train_dataloader, test_dataloader, accuracy_threshold,
                          threshold_all_queries=threshold_all_queries,
                          num_epochs=total_epochs - current_epoch,
                          epochs_to_graph=total_epochs + 1,

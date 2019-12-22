@@ -481,7 +481,7 @@ class QueryModulatingCNNMLP(PoolingDropoutCNNMLP):
         return self.fcout(x_)
 
 
-class TaskOutputConditionalCNNMLP(PoolingDropoutCNNMLP):
+class TaskConditionalCNNMLP(PoolingDropoutCNNMLP):
     """
     A full model using the query-modulating convolutional model; see documentation above.m
     """
@@ -495,7 +495,7 @@ class TaskOutputConditionalCNNMLP(PoolingDropoutCNNMLP):
 
         self.mod_level = mod_level
 
-        super(TaskOutputConditionalCNNMLP, self).__init__(
+        super(TaskConditionalCNNMLP, self).__init__(
             query_length, conv_filter_sizes, conv_dropout, conv_p_dropout,
             mlp_layer_sizes, mlp_dropout, mlp_p_dropout, use_lr_scheduler, lr_scheduler_patience,
             conv_output_size, lr, weight_decay, num_classes, use_mse, loss,
@@ -503,8 +503,10 @@ class TaskOutputConditionalCNNMLP(PoolingDropoutCNNMLP):
         )
 
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
-        return TaskConditionalPoolingDropoutConvInputModel(self.mod_level, self.query_length,
-                                                           conv_filter_sizes, conv_dropout, conv_p_dropout)
+        return TaskConditionalPoolingDropoutConvInputModel(layers_modulated=self.mod_level,
+                                                           query_length=self.query_length,
+                                                           conv_channels_per_layer=conv_filter_sizes,
+                                                           dropout=conv_dropout, p_dropout=conv_dropout)
 
     def forward(self, img, query):
         x = self.conv(img, query)  # adding the query to be modulated

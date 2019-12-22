@@ -384,7 +384,7 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         if layers_modulated is None:
             layers_modulated = list(range(4))
 
-        elif not (np.all(np.array(layers_modulated) > 0) and np.all(np.array(layers_modulated) < 4)):
+        elif not (np.all(np.array(layers_modulated) >= 0) and np.all(np.array(layers_modulated) <= 3)):
             raise ValueError('Query modulation levels should be between 0 and 3 inclusive')
 
         self.input_channels_per_layer = [3] + conv_channels_per_layer

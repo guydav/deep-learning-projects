@@ -172,7 +172,7 @@ if __name__ == '__main__':
     else:
         mod_level = list(range(4))
         if args.task_conditional_modulation_levels is not None:
-            mod_level = [int(x.strip()) for x in args.task_conditional_modulation_levels.split(',')]
+            mod_level = [int(x.strip()) for x in args.task_conditional_modulation_level.split(',')]
 
         model = TaskConditionalCNNMLP(
             mod_level=mod_level,

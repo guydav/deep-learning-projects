@@ -387,7 +387,7 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         elif not (np.all(np.array(layers_modulated) >= 0) and np.all(np.array(layers_modulated) <= 3)):
             raise ValueError('Query modulation levels should be between 0 and 3 inclusive')
 
-        self.input_channels_per_layer = [3] + conv_channels_per_layer
+        self.input_channels_per_layer = [3] + list(conv_channels_per_layer)
         self.layers_modulated = layers_modulated
 
         self.multiplicative_mod = multiplicative_mod

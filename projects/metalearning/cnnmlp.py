@@ -393,16 +393,16 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         self.multiplicative_mod = multiplicative_mod
         if self.multiplicative_mod:
             # TODO: consider how we want to initialize this
-            self.multiplicative_mod_layers = {layer_index: nn.Linear(query_length,
-                                                                     self.input_channels_per_layer[layer_index])
-                                              for layer_index in self.layers_modulated}
+            self.multiplicative_mod_layers = nn.ModuleDict({layer_index: nn.Linear(query_length,
+                                                                                   self.input_channels_per_layer[layer_index])
+                                                            for layer_index in self.layers_modulated})
 
         self.additive_mod = additive_mod
         if self.additive_mod:
             # TODO: consider how we want to initialize this
-            self.additive_mod_layers = {layer_index: nn.Linear(query_length,
-                                                               self.input_channels_per_layer[layer_index])
-                                        for layer_index in self.layers_modulated}
+            self.additive_mod_layers = nn.ModuleDict({layer_index: nn.Linear(query_length,
+                                                                             self.input_channels_per_layer[layer_index])
+                                                      for layer_index in self.layers_modulated})
 
         self.conv1 = nn.Conv2d(3, conv_channels_per_layer[0], 3, stride=1, padding=1)
         self.batchNorm1 = nn.BatchNorm2d(conv_channels_per_layer[0])
@@ -413,8 +413,8 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         self.conv4 = nn.Conv2d(conv_channels_per_layer[2], conv_channels_per_layer[3], 3, stride=1, padding=1)
         self.batchNorm4 = nn.BatchNorm2d(conv_channels_per_layer[3])
 
-        self.conv_layers = [self.conv1, self.conv2, self.conv3, self.conv4]
-        self.batch_norm_layers = [self.batchNorm1, self.batchNorm2, self.batchNorm3, self.batchNorm4]
+        self.conv_layers = nn.ModuleList([self.conv1, self.conv2, self.conv3, self.conv4])
+        self.batch_norm_layers = nn.ModuleList([self.batchNorm1, self.batchNorm2, self.batchNorm3, self.batchNorm4])
 
         self.dropout = dropout
         self.p_dropout = p_dropout

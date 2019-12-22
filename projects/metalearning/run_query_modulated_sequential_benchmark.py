@@ -191,21 +191,18 @@ if __name__ == '__main__':
     model.load_model(current_epoch)
     model = model.cuda()
 
-    wandb.init(entity='meta-learning-scaling', project=args.wandb_project,
-               name=f'{args.name}-{mod_level}-{dataset_random_seed}')
-
     description = args.description
     if len(description) > 0:
         description += '\n'
 
     description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
-    wandb.run.description = description
-    wandb.run.save()
 
-    current_model = model
+    wandb.init(entity='meta-learning-scaling', project=args.wandb_project,
+               name=f'{args.name}-{mod_level}-{dataset_random_seed}',
+               notes=description)
 
-    wandb.config.lr = current_model.lr
-    wandb.config.decay = current_model.weight_decay
+    wandb.config.lr = model.lr
+    wandb.config.decay = model.weight_decay
     wandb.config.loss = 'CE'
     wandb.config.batch_size = train_dataloader.batch_size
     wandb.config.benchmark_dimension = benchmark_dimension

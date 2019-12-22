@@ -393,16 +393,18 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         self.multiplicative_mod = multiplicative_mod
         if self.multiplicative_mod:
             # TODO: consider how we want to initialize this
-            self.multiplicative_mod_layers = nn.ModuleDict({layer_index: nn.Linear(query_length,
-                                                                                   self.input_channels_per_layer[layer_index])
-                                                            for layer_index in self.layers_modulated})
+            self.multiplicative_mod_layers = nn.ModuleDict(
+                {self._get_layer_name('multiplicative', layer_index): nn.Linear(query_length,
+                                                                                self.input_channels_per_layer[layer_index])
+                 for layer_index in self.layers_modulated})
 
         self.additive_mod = additive_mod
         if self.additive_mod:
             # TODO: consider how we want to initialize this
-            self.additive_mod_layers = nn.ModuleDict({layer_index: nn.Linear(query_length,
-                                                                             self.input_channels_per_layer[layer_index])
-                                                      for layer_index in self.layers_modulated})
+            self.additive_mod_layers = nn.ModuleDict(
+                {self._get_layer_name('additive', layer_index): nn.Linear(query_length,
+                                                                          self.input_channels_per_layer[layer_index])
+                 for layer_index in self.layers_modulated})
 
         self.conv1 = nn.Conv2d(3, conv_channels_per_layer[0], 3, stride=1, padding=1)
         self.batchNorm1 = nn.BatchNorm2d(conv_channels_per_layer[0])
@@ -419,17 +421,20 @@ class TaskConditionalPoolingDropoutConvInputModel(nn.Module):
         self.dropout = dropout
         self.p_dropout = p_dropout
 
+    def _get_layer_name(self, layer_type, layer_index):
+        return f'{layer_type}-{layer_index}'
+
     def forward(self, img, task):
         x = img
 
         for layer_index in range(len(self.conv_layers)):
             if self.multiplicative_mod and layer_index in self.layers_modulated:
                 # adding two fake dimensions for the spatial ones => [b, c, w, h]
-                x = x * F.sigmoid(self.multiplicative_mod_layers[layer_index](task)[:, :, None, None])
+                x = x * F.sigmoid(self.multiplicative_mod_layers[self._get_layer_name('multiplicative', layer_index)](task)[:, :, None, None])
 
             if self.additive_mod and layer_index in self.layers_modulated:
                 # adding two fake dimensions for the spatial ones => [b, c, w, h]
-                x = x + self.additive_mod_layers[layer_index](task)[:, :, None, None]
+                x = x + self.additive_mod_layers[self._get_layer_name('additive', layer_index)](task)[:, :, None, None]
 
             x = F.relu(self.conv_layers[layer_index](x))
             x = self.batch_norm_layers[layer_index](x)

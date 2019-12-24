@@ -55,6 +55,8 @@ parser.add_argument('--modulation_level', type=int, choices=range(1, 5), metavar
 
 parser.add_argument('--task-conditional', action='store_true')
 parser.add_argument('--task-conditional-modulation-levels', default=None)
+parser.add_argument('--task-conditional-no-additive', action='store_true')
+parser.add_argument('--task-conditional-no-multiplicative', action='store_true')
 
 parser.add_argument('--name')
 parser.add_argument('--description', default='')
@@ -176,6 +178,8 @@ if __name__ == '__main__':
 
         model = TaskConditionalCNNMLP(
             mod_level=mod_level,
+            multiplicative_mod=not args.task_conditional_no_multiplicative,
+            additive_mod=not args.task_conditional_no_additive,
             query_length=30,
             conv_filter_sizes=(16, 32, 48, 64),
             conv_output_size=4480,

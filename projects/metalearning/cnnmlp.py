@@ -490,7 +490,8 @@ class TaskConditionalCNNMLP(PoolingDropoutCNNMLP):
     """
     A full model using the query-modulating convolutional model; see documentation above.m
     """
-    def __init__(self, mod_level, query_length=30, conv_filter_sizes=(16, 24, 32, 40),
+    def __init__(self, mod_level, multiplicative_mod=True, additive_mod=True,
+                 query_length=30, conv_filter_sizes=(16, 24, 32, 40),
                  conv_dropout=True, conv_p_dropout=0.2,
                  mlp_layer_sizes=(256, 256, 256, 256),
                  mlp_dropout=True, mlp_p_dropout=0.5, use_lr_scheduler=True, lr_scheduler_patience=5,
@@ -499,6 +500,8 @@ class TaskConditionalCNNMLP(PoolingDropoutCNNMLP):
                  name='Pooling_Dropout_CNN_MLP', save_dir=DEFAULT_SAVE_DIR):
 
         self.mod_level = mod_level
+        self.multiplicative_mod = multiplicative_mod
+        self.additive_mod = additive_mod
 
         super(TaskConditionalCNNMLP, self).__init__(
             query_length, conv_filter_sizes, conv_dropout, conv_p_dropout,
@@ -509,6 +512,8 @@ class TaskConditionalCNNMLP(PoolingDropoutCNNMLP):
 
     def _create_conv_module(self, conv_filter_sizes, conv_dropout, conv_p_dropout):
         return TaskConditionalPoolingDropoutConvInputModel(layers_modulated=self.mod_level,
+                                                           multiplicative_mod=self.multiplicative_mod,
+                                                           additive_mod=self.additive_mod,
                                                            query_length=self.query_length,
                                                            conv_channels_per_layer=conv_filter_sizes,
                                                            dropout=conv_dropout, p_dropout=conv_dropout)

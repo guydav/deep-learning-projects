@@ -281,7 +281,8 @@ LINESTYLE_OPTIONS = ['--', ':']
 
 def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                  font_dict=None, x_label=None, y_label=None, y_label_right=False, 
-                                 title=None, hline_y=None, hline_style=None, y_custom_tick_labels=None,
+                                 title=None, hline_y=None, hline_style=None, 
+                                 y_custom_tick_labels=None, y_custom_tick_formatter=None,
                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, title_font_dict=None,
                                  text=None, text_x=None, text_y=None, plot_regression=False, regression_legend=False,
                                  mark_lines=None, num_lines_to_mark=0, num_tasks_to_plot=None):
@@ -385,6 +386,10 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
             ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
     elif y_custom_tick_labels is not None:
         ax.set_yticklabels(y_custom_tick_labels)
+        
+    elif y_custom_tick_formatter is not None:
+        ax.yaxis.set_major_formatter(y_custom_tick_formatter)
+        ax.yaxis.set_minor_formatter(y_custom_tick_formatter)
     
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Number of times trained{log_x and ")" or ""}'
@@ -418,7 +423,8 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
 def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, log_y=False, shade_error=False, sem_n=1,
                                   font_dict=None, x_label=None, y_label=None, y_label_right=False, 
                                   title=None, hline_y=None, hline_style=None, highlight_first_time=None, 
-                                  y_custom_tick_labels=None, log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, 
+                                  y_custom_tick_labels=None, y_custom_tick_formatter=None,
+                                  log_y_custom_ticks=DEFAULT_LOG_SCALE_CUSTOM_TICKS, 
                                   title_font_dict=None, text=None, text_x=None, text_y=None, 
                                   plot_regression=False, regression_legend=False, num_tasks_to_plot=None):
     if font_dict is None:
@@ -530,8 +536,12 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
 
             ax.set_yticks(y_ticks)
             ax.set_yticklabels([f'{y // 1000}k' for y in real_y_ticks])
+            
     elif y_custom_tick_labels is not None:
         ax.set_yticklabels(y_custom_tick_labels)
+        
+    elif y_custom_tick_formatter is not None:
+        ax.yaxis.set_major_formatter(y_custom_tick_formatter)
         
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Episode number{log_x and ")" or ""}'    
@@ -830,13 +840,10 @@ def plot_per_model_per_dimension(baseline, per_query_replication, plot_func, sup
     
     
 def comparison_plot_per_model(baseline, per_query_replication, plot_func, super_title,
-                              comparison_mod_level, conditions=None, comparison_func=np.subtract,
-                              font_dict=None, colormap=DEFAULT_COLORMAP, comparison_first=False,
+                              conditions=None, comparison_func=np.subtract,
+                              font_dict=None, colormap=DEFAULT_COLORMAP, baseline_first=False,
                               ylim=None, data_index=None, log_x=True, log_y=True, shade_error=True, 
                               sem_n=1, baseline_sem_n=1, save_path=None):
-    
-    if comparison_mod_level < 0 or comparison_mod_level > 4:
-        raise ValueError('Comparison model level should be between 0 and 4 inclusive')
     
     if conditions is None:
         conditions = list(range(len(CONDITION_ANALYSES_FIELDS)))
@@ -866,66 +873,29 @@ def comparison_plot_per_model(baseline, per_query_replication, plot_func, super_
     colors = plt.get_cmap(colormap)
     plt.suptitle(super_title, fontsize=font_dict['fontsize'] * 1.5)
     
-    if comparison_mod_level == 0:
-        comparison_set = baseline
-    else:
-        comparison_set = per_query_replication[comparison_mod_level]
-    
-    # plot the baseline
-    if comparison_mod_level != 0:
-        for index, (dimension_index, dimension_name) in enumerate([(c, CONDITION_ANALYSES_FIELDS[c]) for c in conditions]):
-            ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, index + 1)
-            
-            if comparison_first:
-                results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
-                                               baseline[dimension_index][data_index].mean,)
-            else:
-                results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
-                                               baseline[dimension_index][data_index].mean,)
-            # TODO: fix the stddev computation
-            results_std = comparison_set[dimension_index][data_index].std
-            results = ResultSet(name='diff', mean=results_mean, std=results_std)
-
-            title = dimension_name.capitalize()
-
-            x_label = ''
-
-            y_label = ''
-            if index == 0:
-                y_label = f'No query\nmodulation'
-
-            plot_func(ax, results, colors, ylim=ylim, log_x=log_x, log_y=log_y, shade_error=shade_error, 
-                      sem_n=baseline_sem_n[dimension_index], font_dict=font_dict, 
-                      x_label=x_label, y_label=y_label, title=title)
-    
     # plot per query
     for replication_level, replication_analyses in per_query_replication.items():
-        if replication_level == comparison_mod_level:
-            continue
-        
         for index, (dimension_index, dimension_name) in enumerate([(c, CONDITION_ANALYSES_FIELDS[c]) for c in conditions]):
-            replication_level_for_axes = replication_level
-            if replication_level > comparison_mod_level:
-                replication_level_for_axes -= 1
+            replication_level_for_axes = replication_level - 1
             
             ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 
                              replication_level_for_axes * COMPARISON_NCOLS + index + 1)
 
 
-            if comparison_first:
-                results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
+            if baseline_first:
+                results_mean = comparison_func(baseline[dimension_index][data_index].mean,
                                                replication_analyses[dimension_index][data_index].mean,)
             else:
                 results_mean = comparison_func(replication_analyses[dimension_index][data_index].mean,
-                                               comparison_set[dimension_index][data_index].mean,
+                                               baseline[dimension_index][data_index].mean,
                                                )
             
             # TODO: fix the stddev computation
-            results_std = comparison_set[dimension_index][data_index].std
+            results_std = baseline[dimension_index][data_index].std
             results = ResultSet(name='diff', mean=results_mean, std=results_std)
                 
             title = ''
-            if replication_level == 1 and comparison_mod_level == 0:
+            if replication_level == 1:
                 title = dimension_name.capitalize()
                 
             x_label = ''
@@ -947,16 +917,13 @@ DEFAULT_COMPARISON_HLINE_STYLE = dict(linestyle='--', linewidth=4, color='black'
 
     
 def combined_comparison_plots(baseline, per_query_replication, super_title,
-                              comparison_mod_level, dimension_index=COMBINED_INDEX, comparison_func=np.subtract,
-                              font_dict=None, comparison_first=False, ylim=None, data_index=None, 
+                              dimension_index=COMBINED_INDEX, comparison_func=np.subtract,
+                              font_dict=None, baseline_first=False, ylim=None, data_index=None, 
                               log_x=True, log_y=True, shade_error=True, sem_n=1, baseline_sem_n=1, 
-                              title_font_dict=None, y_custom_tick_labels=None,
+                              title_font_dict=None, y_custom_tick_labels=None, y_custom_tick_formatter=None,
                               times_trained_colormap=DEFAULT_COLORMAP, tasks_trained_colormap=DEFAULT_COLORMAP,
                               null_hline_y=None, null_hline_style=None, plot_y_label='', add_colorbars=True,
                               save_path=None, external_axes=None, replication_levels=None, custom_titles=None):
-    
-    if comparison_mod_level < 0 or comparison_mod_level > 4:
-        raise ValueError('Comparison model level should be between 0 and 4 inclusive')
         
     COMPARISON_NROWS = 2 #(PER_MODEL_NROWS - 1)
     COMPARISON_NCOLS = len(per_query_replication) #(PER_MODEL_NROWS - 1) # 2
@@ -991,62 +958,9 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
         hline_style.update(null_hline_style)
     
     null_hline_style = hline_style
-    
-    if comparison_mod_level == 0:
-        comparison_set = baseline
-    else:
-        comparison_set = per_query_replication[comparison_mod_level]
         
     times_trained_colors = plt.get_cmap(times_trained_colormap)
     tasks_trained_colors = plt.get_cmap(tasks_trained_colormap)
-    
-    # plot the baseline
-    if comparison_mod_level != 0:
-        if external_axes is not None:
-            num_times_trained_ax = external_axes[0]
-        else:
-            num_times_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, 1)
-
-        if comparison_first:
-            results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
-                                           baseline[dimension_index][data_index].mean)
-        else:
-            results_mean = comparison_func(baseline[dimension_index][data_index].mean,
-                                           comparison_set[dimension_index][data_index].mean)
-            
-        if comparison_func == np.subtract:
-            results_std = np.sqrt(np.power(baseline[dimension_index][data_index].std, 2) + np.power(comparison_set[dimension_index][data_index].std, 2))
-        else:
-            # TODO: fix the stddev computation if we ever decide to use it here
-            results_std = comparison_set[dimension_index][data_index].std
-            
-        results = ResultSet(name='diff', mean=results_mean, std=results_std)
-
-        title = None  # use the default title
-        x_label = ''
-        y_label = plot_y_label
-
-        if num_times_trained_ax is not None:
-            examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
-                                         log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
-                                         font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                         y_custom_tick_labels=y_custom_tick_labels,
-                                         title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                         title_font_dict=title_font_dict)
-
-        if external_axes is not None:
-            num_tasks_trained_ax = external_axes[1]
-        else:
-            num_tasks_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, COMPARISON_NCOLS + 1)
-        y_label = f'No query\nmodulation'
-
-        if num_tasks_trained_ax is not None:
-            examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
-                                          log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=baseline_sem_n,
-                                          font_dict=font_dict, x_label=x_label, y_label=y_label, y_label_right=True,
-                                          y_custom_tick_labels=y_custom_tick_labels,
-                                          title=title, hline_y=null_hline_y, hline_style=null_hline_style,
-                                          title_font_dict=title_font_dict)
     
     # plot per query
     if replication_levels == None:
@@ -1054,31 +968,26 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
     
     for replication_level in replication_levels:
         replication_analyses = per_query_replication[replication_level]
-        
-        if replication_level == comparison_mod_level:
-            continue
 
-        replication_level_for_axes = replication_level
-        if replication_level > comparison_mod_level:
-            replication_level_for_axes -= 1
+        replication_level_for_axes = replication_level - 1
         
         if external_axes is not None:
             num_times_trained_ax = external_axes[0]
         else:
             num_times_trained_ax = plt.subplot(COMPARISON_NROWS, COMPARISON_NCOLS, replication_level_for_axes + 1)
 
-        if comparison_first:
-            results_mean = comparison_func(comparison_set[dimension_index][data_index].mean,
+        if baseline_first:
+            results_mean = comparison_func(baseline[dimension_index][data_index].mean,
                                            replication_analyses[dimension_index][data_index].mean)
         else:
             results_mean = comparison_func(replication_analyses[dimension_index][data_index].mean,
-                                           comparison_set[dimension_index][data_index].mean)
+                                           baseline[dimension_index][data_index].mean)
 
         if comparison_func == np.subtract:
-            results_std = np.sqrt(np.power(replication_analyses[dimension_index][data_index].std, 2) + np.power(comparison_set[dimension_index][data_index].std, 2))
+            results_std = np.sqrt(np.power(replication_analyses[dimension_index][data_index].std, 2) + np.power(baseline[dimension_index][data_index].std, 2))
         else:
             # TODO: fix the stddev computation if we ever decide to use it here
-            results_std = comparison_set[dimension_index][data_index].std
+            results_std = baseline[dimension_index][data_index].std
             
         results = ResultSet(name='diff', mean=results_mean, std=results_std)
     
@@ -1103,7 +1012,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
             examples_by_times_trained_on(num_times_trained_ax, results, times_trained_colors, ylim=ylim, 
                                          log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
                                          font_dict=font_dict, x_label=x_label, y_label=y_label, 
-                                         y_custom_tick_labels=y_custom_tick_labels,
+                                         y_custom_tick_labels=y_custom_tick_labels, y_custom_tick_formatter=y_custom_tick_formatter,
                                          title=title, hline_y=null_hline_y, hline_style=null_hline_style,
                                          title_font_dict=title_font_dict)
 
@@ -1119,7 +1028,7 @@ def combined_comparison_plots(baseline, per_query_replication, super_title,
             examples_by_num_tasks_trained(num_tasks_trained_ax, results, tasks_trained_colors, ylim=ylim, 
                                           log_x=log_x, log_y=log_y, shade_error=shade_error, sem_n=sem_n,
                                           font_dict=font_dict, x_label=x_label, y_label=y_label,
-                                          y_custom_tick_labels=y_custom_tick_labels,
+                                          y_custom_tick_labels=y_custom_tick_labels, y_custom_tick_formatter=y_custom_tick_formatter,
                                           title=title, hline_y=null_hline_y, hline_style=null_hline_style,
                                           title_font_dict=title_font_dict)
         

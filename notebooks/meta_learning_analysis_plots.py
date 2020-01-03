@@ -362,6 +362,9 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     if log_y:
         if log_y == 'simple':
             ax.set_yscale('log')
+            ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+            ax.yaxis.set_minor_formatter(matplotlib.ticker.ScalarFormatter())
+            
         else:
     #         ax.set_yscale("log", nonposy='clip')
             y_min, y_max = ax.get_ylim()
@@ -387,7 +390,7 @@ def examples_by_times_trained_on(ax, results, colors, ylim=None, log_x=False, lo
     elif y_custom_tick_labels is not None:
         ax.set_yticklabels(y_custom_tick_labels)
         
-    elif y_custom_tick_formatter is not None:
+    if y_custom_tick_formatter is not None:
         ax.yaxis.set_major_formatter(y_custom_tick_formatter)
         ax.yaxis.set_minor_formatter(y_custom_tick_formatter)
     
@@ -514,6 +517,9 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     if log_y:
         if log_y == 'simple':
             ax.set_yscale('log')
+            ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+            ax.yaxis.set_minor_formatter(matplotlib.ticker.ScalarFormatter())
+
         else:
     #         ax.set_yscale("log", nonposy='clip')
             y_min, y_max = ax.get_ylim()
@@ -540,8 +546,9 @@ def examples_by_num_tasks_trained(ax, results, colors, ylim=None, log_x=False, l
     elif y_custom_tick_labels is not None:
         ax.set_yticklabels(y_custom_tick_labels)
         
-    elif y_custom_tick_formatter is not None:
+    if y_custom_tick_formatter is not None:
         ax.yaxis.set_major_formatter(y_custom_tick_formatter)
+        ax.yaxis.set_minor_formatter(y_custom_tick_formatter)
         
     if x_label is None:
         x_label = f'{log_x and "Log(" or ""}Episode number{log_x and ")" or ""}'    

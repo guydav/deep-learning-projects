@@ -229,7 +229,7 @@ if __name__ == '__main__':
     if len(description) > 0:
         description += '\n'
 
-    description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
+    description += f'benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
 
     # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
     # os.environ['WANDB_RESUME'] = 'must'

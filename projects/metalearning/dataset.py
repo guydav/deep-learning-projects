@@ -432,7 +432,7 @@ class CustomCurriculumSequentialBenchmarkMetaLearningDataset(SequentialBenchmark
                 task_to_images[previous_query] = range(self.num_images)
 
             else:
-                current_coreset_size = coreset_sizes[previous_query]
+                current_coreset_size = coreset_sizes[previous_query_index]
 
                 smaller_proportion = 0
                 attempt_count = 0

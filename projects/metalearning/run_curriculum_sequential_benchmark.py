@@ -80,7 +80,11 @@ parser.add_argument('--debug', action='store_true')
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    print(args)
+
+    print(' ' * 26 + 'Options')
+    for k, v in vars(args).items():
+        print(' ' * 26 + k + ': ' + str(v))
+
     dataset_path = args.path_dataset
     batch_size = args.batch_size
     num_workers = args.num_workers

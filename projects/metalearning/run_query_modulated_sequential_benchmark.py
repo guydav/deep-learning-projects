@@ -41,7 +41,7 @@ DEFAULT_TRAIN_CORESET_SIZE = 22500
 parser.add_argument('--train_coreset_size', type=int, default=DEFAULT_TRAIN_CORESET_SIZE)
 DEFAULT_TEST_CORESET_SIZE = 5000
 parser.add_argument('--test_coreset_size', type=int, default=DEFAULT_TEST_CORESET_SIZE)
-parser.add_argument('--coreset_size_per_query', type=int, default=0)
+parser.add_argument('--coreset_size_per_query', type=bool, default=False)
 parser.add_argument('--query_order', default=None)
 DEFAULT_ACCURACY_THRESHOLD = 0.95
 parser.add_argument('--accuracy_threshold', type=float, default=DEFAULT_ACCURACY_THRESHOLD)

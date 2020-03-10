@@ -376,6 +376,96 @@ class SequentialBenchmarkMetaLearningDataset(MetaLearningH5DatasetFromDescriptio
         return self.current_epoch_queries[index]
 
 
+class CustomCurriculumSequentialBenchmarkMetaLearningDataset(SequentialBenchmarkMetaLearningDataset):
+    def __init__(self, in_file, benchmark_dimension, random_seed, curriculum_function,
+                 query_order, single_dimension=True, transform=None,
+                 start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.2, num_sampling_attempts=20):
+
+        self.curriculum_function = curriculum_function
+
+        super(CustomCurriculumSequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file=in_file, benchmark_dimension=benchmark_dimension, random_seed=random_seed,
+            previous_query_coreset_size=None, query_order=query_order, single_dimension=single_dimension,
+            coreset_size_per_query=False, transform=transform, start_index=start_index,
+            end_index=end_index, return_indices=return_indices, num_dimensions=num_dimensions,
+            features_per_dimension=features_per_dimension, imbalance_threshold=imbalance_threshold,
+            num_sampling_attempts=num_sampling_attempts
+        )
+
+    def _allocate_images_to_tasks(self, depth=0):
+        task_to_images = OrderedDict()
+        episode_number = self.current_query_index + 1
+
+        if depth >= self.num_sampling_attempts:
+            raise ValueError('Warning, exceeded maximum number of sampling attempts, this is not great')
+
+        image_set = set(range(self.num_images))
+
+        unrounded_coreset_sizes = np.array([self.curriculum_function(episode_number, task)
+                                   for task in range(1, episode_number + 1)])
+        rounded_coreset_sizes = np.around(unrounded_coreset_sizes)
+
+        rounded_sum = np.sum(rounded_coreset_sizes)
+        unrounded_sum = np.sum(unrounded_coreset_sizes)
+
+        if rounded_sum != unrounded_sum:
+            # Too many were rounded down, we need to increment.
+            if rounded_sum < unrounded_sum:
+                increment_index = np.argmax(unrounded_coreset_sizes - rounded_coreset_sizes)
+                rounded_coreset_sizes[increment_index] += 1
+
+            # Too many were rounded down, we need to decrement
+            else:
+                decrement_index = np.argmin(unrounded_coreset_sizes - rounded_coreset_sizes)
+                rounded_coreset_sizes[decrement_index] -= 1
+
+        coreset_sizes = rounded_coreset_sizes.astype(np.int)
+
+        for previous_query_index in range(self.current_query_index):
+            previous_query = self.query_order[previous_query_index]
+
+            # This would happen in our test loader:
+            if self.previous_query_coreset_size == self.num_images:
+                task_to_images[previous_query] = range(self.num_images)
+
+            else:
+                current_coreset_size = coreset_sizes[previous_query]
+
+                smaller_proportion = 0
+                attempt_count = 0
+                current_task_coreset = []
+
+                while smaller_proportion < self.imbalance_threshold \
+                        and attempt_count < self.num_sampling_attempts:
+                    attempt_count += 1
+                    image_list = list(image_set)
+
+                    current_task_coreset = np.random.choice(image_list, current_coreset_size, False)
+                    positive_count = sum([x in self.positive_images[previous_query] for x in current_task_coreset])
+                    smaller_proportion = min(positive_count / current_coreset_size,
+                                             1 - (positive_count / current_coreset_size))
+
+                    if attempt_count >= self.num_sampling_attempts:
+                        print(f'Warning, failed to balance query #{previous_query_index + 1}, restarting...')
+                        return self._allocate_images_to_tasks(depth + 1)
+
+                image_set = image_set.difference(set(current_task_coreset))
+                task_to_images[previous_query] = current_task_coreset
+
+        current_query = self.query_order[self.current_query_index]
+
+        # Handle the current task
+        latest_task_training_set_size = coreset_sizes[-1]
+        if latest_task_training_set_size < len(image_set):
+            image_set = set(np.random.choice(list(image_set), latest_task_training_set_size, False))
+
+        task_to_images[current_query] = image_set
+
+        return task_to_images
+
+
 class BalancedBatchesMetaLearningDataset(SequentialBenchmarkMetaLearningDataset):
     def __init__(self, in_file, batch_size, benchmark_dimension, random_seed,
                  previous_query_coreset_size, query_order, single_dimension=True,
@@ -448,6 +538,79 @@ class BalancedBatchesMetaLearningDataset(SequentialBenchmarkMetaLearningDataset)
 
     def _compute_indices(self, index):
         return self.current_epoch_queries[index]
+
+
+class BalancedBatchesCustomCurriculumSequentialBenchmarkMetaLearningDataset(CustomCurriculumSequentialBenchmarkMetaLearningDataset):
+    def __init__(self, in_file, batch_size, benchmark_dimension, random_seed, curriculum_function,
+                 query_order, single_dimension=True, transform=None,
+                 start_index=0, end_index=None, return_indices=True,
+                 num_dimensions=3, features_per_dimension=(10, 10, 10),
+                 imbalance_threshold=0.2, num_sampling_attempts=20):
+
+        super(BalancedBatchesCustomCurriculumSequentialBenchmarkMetaLearningDataset, self).__init__(
+            in_file=in_file, benchmark_dimension=benchmark_dimension, random_seed=random_seed,
+            curriculum_function=curriculum_function, query_order=query_order,
+            single_dimension=single_dimension, transform=transform, start_index=start_index,
+            end_index=end_index, return_indices=return_indices, num_dimensions=num_dimensions,
+            features_per_dimension=features_per_dimension, imbalance_threshold=imbalance_threshold,
+            num_sampling_attempts=num_sampling_attempts
+        )
+
+        self.batch_size = batch_size
+        self.num_batches_per_epoch = self.num_images // self.batch_size
+
+    def start_epoch(self, debug=False):
+        """
+        Sample the images for each coreset query to be used for the current epoch. This supports a number of
+        different variations:
+
+        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
+        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
+        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
+
+        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
+        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
+        assign the remaining images to the current task.
+        """
+        task_to_images = self._allocate_images_to_tasks()
+        for task in task_to_images:
+            image_list = list(task_to_images[task])
+            np.random.shuffle(image_list)
+            task_to_images[task] = image_list
+
+        # if only one task, shuffle its examples, call it a day
+        if self.current_query_index == 0:
+            first_task = self.query_order[0]
+            first_task_images = task_to_images[first_task]
+            self.current_epoch_queries = list(zip(first_task_images, itertools.cycle([first_task])))
+            return
+
+        # more than one task -- we can deal with the current task first
+        # since it occupies half of every epoch
+        current_task = self.query_order[self.current_query_index]
+        current_task_images = task_to_images[current_task]
+        current_task_per_batch = self.batch_size // 2
+
+        batches = [list(zip(current_task_images[i * current_task_per_batch:(i + 1) * current_task_per_batch],
+                            itertools.cycle([current_task])))
+                   for i in range(self.num_batches_per_epoch)]
+
+        # move onto the previous tasks
+        prev_task_per_batch = current_task_per_batch // self.current_query_index
+        num_to_round_up = current_task_per_batch % self.current_query_index
+
+        for batch_index in range(self.num_batches_per_epoch):
+            tasks_rounding_up = sorted(self.query_order[:self.current_query_index],
+                                       key=lambda x: len(task_to_images[x]),
+                                       reverse=True)[:num_to_round_up]
+
+            for task in self.query_order[:self.current_query_index]:
+                num_task_examples = prev_task_per_batch + 1 * (task in tasks_rounding_up)
+                batches[batch_index].extend(list(zip(task_to_images[task][:num_task_examples],
+                                                     itertools.cycle([task]))))
+                task_to_images[task] = task_to_images[task][num_task_examples:]
+
+        self.current_epoch_queries = [pair for batch in batches for pair in batch]
 
 
 class ForgettingExperimentMetaLearningDataset(MetaLearningH5DatasetFromDescription):

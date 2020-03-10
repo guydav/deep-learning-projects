@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../projects/')
+
 import numpy as np
 import pandas as pd
 import scipy
@@ -12,6 +15,8 @@ import tabulate
 import wandb
 from collections import namedtuple, defaultdict, OrderedDict
 import json
+
+from metalearning import cnnmlp
 
 API = wandb.Api()
 MAX_HISTORY_SAMPLES = 4000
@@ -50,8 +55,9 @@ ResultSet = namedtuple('ResultSet', RESULT_SET_FIELDS)
 AnalysisSet = namedtuple('AnalysisSet', ANALYSIS_SET_FIELDS)
 ConditionAnalysesSet = namedtuple('ConditionAnalysesSet', CONDITION_ANALYSES_FIELDS)
 TotalCurveResults = namedtuple('TotalCurveResults', TOTAL_CURVE_FIELDS)
+TaskConditionalWeights = namedtuple('TaskConditionalWeights', ('additive', 'multiplicative'))
 
-NAMED_TUPLE_CLASSES = (ResultSet, AnalysisSet, ConditionAnalysesSet, TotalCurveResults)
+NAMED_TUPLE_CLASSES = (ResultSet, AnalysisSet, ConditionAnalysesSet, TotalCurveResults, TaskConditionalWeights)
 for NamedTupleClass in NAMED_TUPLE_CLASSES:
     NamedTupleClass.__new__.__defaults__ = (None,) * len(NamedTupleClass._fields)
 
@@ -67,6 +73,8 @@ ANALYSIS_NAMES_TO_FIELDS = {name: field for (name, field) in
 
 CACHE_PATH = './analyses_caches/meta_learning_analyses_cache.pickle'
 BACKUP_CACHE_PATH = './analyses_caches/meta_learning_analyses_cache_{date}.pickle'
+
+
 
 
 def refresh_cache(new_values_dict=None, cache_path=CACHE_PATH):
@@ -663,3 +671,70 @@ def sign_test_with_sem(values, sample_sizes):
             wilcoxon_p_values[row, col] = p
             
     return row_faster_results, col_faster_results, wilcoxon_statistics, wilcoxon_p_values
+
+
+DEFAULT_LEARNING_RATE = 5e-4
+DEFAULT_WEIGHT_DECAY = 1e-4
+
+
+def create_task_conditional_model(additive=True, multiplicative=True, checkpoint_path=None, name=None):
+    mod_level = list(range(4))
+
+    model = cnnmlp.TaskConditionalCNNMLP(
+        mod_level=mod_level,
+        multiplicative_mod=multiplicative,
+        additive_mod=additive,
+        query_length=30,
+        conv_filter_sizes=(16, 32, 48, 64),
+        conv_output_size=4480,
+        mlp_layer_sizes=(512, 512, 512, 512),
+        lr=DEFAULT_LEARNING_RATE,
+        weight_decay=DEFAULT_WEIGHT_DECAY,
+        use_lr_scheduler=False,
+        conv_dropout=False,
+        mlp_dropout=False,
+        name=name)
+
+    if checkpoint_path is not None:
+        model.load_state(checkpoint_path)
+        
+    return model
+
+
+def parse_task_conditional_weights(runs, additive=True, multiplicative=True, 
+                                   layers=range(4), download_root='/tmp', ignore_runs=None):
+    weights_by_run_id = {}
+
+    for i, run in enumerate(runs):
+        if ignore_runs is not None and run.name in ignore_runs:
+            continue
+        
+        j = i + 1
+        if j % 10 == 0:
+            print(run.name, j)
+        else:
+            print(run.name)
+            
+        dimension = run.config['benchmark_dimension']
+        
+        last_checkpoint_file = run.file(f'{run.name.replace("[0, 1, 2, 3]-", "")}-query-9.pth')
+        last_checkpoint_file.download(replace=True, root=download_root)
+        model = create_task_conditional_model(additive=additive, multiplicative=multiplicative,
+                                             checkpoint_path=os.path.join(download_root, last_checkpoint_file.name))
+
+        additive_weights = None
+        multiplicative_weights = None
+
+        if additive:
+            additive_weights = [model.conv.additive_mod_layers[f'additive-{i}'].weight.detach().cpu().numpy()[:, dimension * 10:(dimension + 1) * 10] 
+                                for i in layers]
+
+        if multiplicative:
+            multiplicative_weights = [model.conv.multiplicative_mod_layers[f'multiplicative-{i}'].weight.detach().cpu().numpy()[:, dimension * 10:(dimension + 1) * 10]
+                                      for i in layers]
+
+        weights_by_run_id[run.config['latin_square_index']] = TaskConditionalWeights(additive=additive_weights, multiplicative=multiplicative_weights)
+
+    return weights_by_run_id
+    
+

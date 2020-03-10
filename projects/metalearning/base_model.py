@@ -277,7 +277,12 @@ class BasicModel(nn.Module):
             self.results.update(pickle.load(f))
 
     def load_state(self, path):
-        loaded_state = torch.load(path)
+        map_location = None
+
+        if not next(self.parameters()).is_cuda:
+            map_location = 'cpu'
+
+        loaded_state = torch.load(path, map_location=map_location)
         state = self.state_dict()
         state.update(loaded_state)
         self.load_state_dict(state)

@@ -422,6 +422,7 @@ class CustomCurriculumSequentialBenchmarkMetaLearningDataset(SequentialBenchmark
                 rounded_coreset_sizes[decrement_index] -= 1
 
         coreset_sizes = rounded_coreset_sizes.astype(np.int)
+        print(f'Coreset task sizes: {coreset_sizes}')
 
         for previous_query_index in range(self.current_query_index):
             previous_query = self.query_order[previous_query_index]

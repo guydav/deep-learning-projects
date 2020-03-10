@@ -226,17 +226,17 @@ if __name__ == '__main__':
 
     if args.debug: print(f'wandb project is {args.wandb_project}')
 
-    # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
-    # os.environ['WANDB_RESUME'] = 'must'
-    wandb.init(entity='meta-learning-scaling', project=args.wandb_project,
-               name=f'{args.name}-{dataset_random_seed}')
-
     description = args.description
     if len(description) > 0:
         description += '\n'
 
     description += f'coreset size: {train_coreset_size}, benchmark dimension: {benchmark_dimension}, dataset random seed: {dataset_random_seed}, query order: {list(query_order)}, threshold all queries: {threshold_all_queries}'
-    wandb.run.description = description
+
+    # os.environ['WANDB_RUN_ID'] ='98w3kzlw'
+    # os.environ['WANDB_RESUME'] = 'must'
+    wandb.init(entity='meta-learning-scaling', project=args.wandb_project,
+               name=f'{args.name}-{dataset_random_seed}', notes=description)
+
     wandb.run.save()
 
     current_model = model

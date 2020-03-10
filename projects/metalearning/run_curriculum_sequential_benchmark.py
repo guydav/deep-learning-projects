@@ -71,8 +71,7 @@ parser.add_argument('--previous_tasks_example_ratio', type=float, default=DEFAUL
 # parser.add_argument('--maml', action='store_true')
 # DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
 # parser.add_argument('--fast_weight_learning_rate', type=float, default=DEFAULT_FAST_WEIGHT_LEARNING_RATE)
-# parser.add_argument('--return_indices', action='store_true')
-#
+parser.add_argument('--return_indices', action='store_true')
 parser.add_argument('--balanced_batches', action='store_true')
 # parser.add_argument('--maml_meta_test', action='store_true')
 

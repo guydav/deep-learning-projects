@@ -64,7 +64,7 @@ DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
 DEFAULT_LATEST_TASK_NUM_EXAMPLES = 22500
-parser.add_argument('--latest_task_num_examples', type=float, default=DEFAULT_LATEST_TASK_NUM_EXAMPLES)
+parser.add_argument('--latest_task_num_examples', type=int, default=DEFAULT_LATEST_TASK_NUM_EXAMPLES)
 DEFAULT_PREVIOUS_TASKS_EXAMPLE_RATIO = 1.25
 parser.add_argument('--previous_tasks_example_ratio', type=float, default=DEFAULT_PREVIOUS_TASKS_EXAMPLE_RATIO)
 

@@ -63,10 +63,14 @@ parser.add_argument('--threshold_all_queries', type=int, default=1)
 DEFAULT_WANDB_PROJECT = 'sequential-benchmark'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
 
-DEFAULT_LATEST_TASK_NUM_EXAMPLES = 22500
-parser.add_argument('--latest_task_num_examples', type=int, default=DEFAULT_LATEST_TASK_NUM_EXAMPLES)
-DEFAULT_PREVIOUS_TASKS_EXAMPLE_RATIO = 1.25
-parser.add_argument('--previous_tasks_example_ratio', type=float, default=DEFAULT_PREVIOUS_TASKS_EXAMPLE_RATIO)
+DEFAULT_RATIO_CURRICULUM_LATEST_TASK_NUM_EXAMPLES = 22500
+parser.add_argument('--latest_task_num_examples', type=int, default=DEFAULT_RATIO_CURRICULUM_LATEST_TASK_NUM_EXAMPLES)
+DEFAULT_RATIO_CURRICULUM_PREVIOUS_TASKS_EXAMPLE_RATIO = 1.25
+parser.add_argument('--previous_tasks_example_ratio', type=float, default=DEFAULT_RATIO_CURRICULUM_PREVIOUS_TASKS_EXAMPLE_RATIO)
+
+parser.add_argument('--use_power_function_curriculum', action='store_true')
+DEFAULT_POWER_CURRICULUM_ALPHA = 1.14
+parser.add_argument('--power_curriculum_alpha', type=float, default=DEFAULT_POWER_CURRICULUM_ALPHA)
 
 # parser.add_argument('--maml', action='store_true')
 # DEFAULT_FAST_WEIGHT_LEARNING_RATE = 5e-4
@@ -111,6 +115,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(dataset_random_seed)
 
     test_coreset_size = args.test_coreset_size
+    training_set_size = TOTAL_DATASET_SIZE - test_coreset_size
     # train_coreset_size = args.train_coreset_size
     # train_coreset_size_per_query = bool(args.coreset_size_per_query)
 
@@ -143,7 +148,7 @@ if __name__ == '__main__':
     total_epochs = args.max_epochs
     threshold_all_queries = bool(args.threshold_all_queries)
 
-    def curriculum_function(episode_number, task_number):
+    def ratio_curriculum_function(episode_number, task_number):
         if task_number > episode_number:
             raise ValueError(
                 f'Cannot compute examples for a higher task number ({task_number}) than the episode number ({episode_number})')
@@ -151,12 +156,24 @@ if __name__ == '__main__':
         if episode_number == task_number:
             return args.latest_task_num_examples
 
-        total_previous_task_examples = TOTAL_DATASET_SIZE - test_coreset_size - args.latest_task_num_examples
+        total_previous_task_examples = training_set_size - args.latest_task_num_examples
         last_previous_task_number = episode_number - 1
         first_task_examples = total_previous_task_examples / np.sum(np.power(args.previous_tasks_example_ratio, range(last_previous_task_number)))
 
         return first_task_examples * (args.previous_tasks_example_ratio ** (task_number - 1))
 
+    def power_curriculum_function(episode_number, task_number):
+        if task_number > episode_number:
+            raise ValueError(
+                f'Cannot compute examples for a higher task number ({task_number}) than the episode number ({episode_number})')
+
+        unnormalized_episode_props = np.power(np.arange(episode_number, 0, -1), -args.power_curriculum_alpha)
+        normalized_episode_props = unnormalized_episode_props / np.sum(unnormalized_episode_props)
+        return normalized_episode_props[task_number - 1] * training_set_size
+
+    curriculum_function = ratio_curriculum_function
+    if args.use_power_function_curriculum:
+        curriculum_function = power_curriculum_function
 
     train_dataset_class = CustomCurriculumSequentialBenchmarkMetaLearningDataset
     train_shuffle = True

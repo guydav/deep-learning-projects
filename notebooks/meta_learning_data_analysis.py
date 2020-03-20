@@ -15,6 +15,7 @@ import tabulate
 import wandb
 from collections import namedtuple, defaultdict, OrderedDict
 import json
+from ipypb import ipb
 
 from metalearning import cnnmlp
 
@@ -73,8 +74,6 @@ ANALYSIS_NAMES_TO_FIELDS = {name: field for (name, field) in
 
 CACHE_PATH = './analyses_caches/meta_learning_analyses_cache.pickle'
 BACKUP_CACHE_PATH = './analyses_caches/meta_learning_analyses_cache_{date}.pickle'
-
-
 
 
 def refresh_cache(new_values_dict=None, cache_path=CACHE_PATH):
@@ -441,6 +440,40 @@ def query_modulated_runs_by_dimension(max_rep_id):
             results[level][3].append(run)
             
     return results
+
+
+def epochs_to_taks_completions(runs, name='epochs_to_completion', ignore_runs=None, samples=500, ipb_desc=None):
+    results_per_run = []
+    
+    for run in ipb(runs, desc=ipb_desc):
+#         if i > 0 and i % 10 == 0:
+#             print(run.name, i)
+#         else:
+#             print(run.name)
+        
+        if ignore_runs is not None and run.name in ignore_runs:
+            continue
+            
+        df = run.history(pandas=True, samples=samples)
+        first_row_blank = int(np.isnan(df['Test Accuracy'][0]))
+        first_task_finished = df['Test Accuracy, Query #2'].first_valid_index() - first_row_blank 
+        
+        task_finishes = [first_task_finished]
+        
+        for current_task in range(2, 11):
+            current_task_start = df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
+
+            if current_task == 10:
+                current_task_end = df.shape[0]
+            else:
+                current_task_end = df[f'Test Accuracy, Query #{current_task + 1}'].first_valid_index()
+                
+            task_finishes.append(current_task_end)
+            
+        results_per_run.append(task_finishes)
+
+    return ResultSet(name=name, mean=np.nanmean(results_per_run, axis=0), std=np.nanstd(results_per_run, axis=0)),\
+            ResultSet(name=name, mean=np.nanmean(np.log(results_per_run), axis=0), std=np.nanstd(np.log(results_per_run), axis=0))
 
 
 def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTORY_SAMPLES, parse_func=parse_run_results):

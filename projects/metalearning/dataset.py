@@ -562,16 +562,8 @@ class BalancedBatchesCustomCurriculumSequentialBenchmarkMetaLearningDataset(Cust
 
     def start_epoch(self, debug=False):
         """
-        Sample the images for each coreset query to be used for the current epoch. This supports a number of
-        different variations:
-
-        if coreset_size_per_query is True, we supplied a coreset size to be used for all queries, rather than divided
-        between them -- in this case, sample a coreset for each query and move on with our life. This mode is used in
-        our test-set data loader, with all 5000 images assigned to each query - that is, no actual randomization.
-
-        If coreset_size_per_query is False, we divide the coreset evenly between the previous tasks. We then sample an
-        appropriately sized coreset, making sure it is balanced, and after we finish sampling the coresets, we
-        assign the remaining images to the current task.
+        Take the allocation of tasks to images from `self._allocate_images_to_tasks()`, and split them into balanced
+        batches. Correctly handles the logic of tasks not having the same number of examples in each one.
         """
         task_to_images = self._allocate_images_to_tasks()
         for task in task_to_images:
@@ -586,30 +578,39 @@ class BalancedBatchesCustomCurriculumSequentialBenchmarkMetaLearningDataset(Cust
             self.current_epoch_queries = list(zip(first_task_images, itertools.cycle([first_task])))
             return
 
-        # more than one task -- we can deal with the current task first
-        # since it occupies half of every epoch
-        current_task = self.query_order[self.current_query_index]
-        current_task_images = task_to_images[current_task]
-        current_task_per_batch = self.batch_size // 2
+        # The new logic needs to be different -- we might not have half from the current task per batch
+        # and the newest task might not occupy half of the examples, so no reason to treat it uniquely
+        batches = [list() for _ in range(self.num_batches_per_epoch)]
 
-        batches = [list(zip(current_task_images[i * current_task_per_batch:(i + 1) * current_task_per_batch],
-                            itertools.cycle([current_task])))
-                   for i in range(self.num_batches_per_epoch)]
+        # The next complication comes from the fact that we're going to need to round up each task a different
+        # number of times. First, we can compute how many times we'll have to round up each task
+        examples_per_task = np.array([len(task_to_images[task])
+                                      for task in self.query_order[:self.current_query_index + 1]])
+        rounded_down_ex_per_task_per_batch = np.floor(examples_per_task / self.num_batches_per_epoch).astype(np.int)
+        rounded_down_batch_size = np.sum(rounded_down_ex_per_task_per_batch)
+        num_to_round_up_per_batch = self.batch_size - rounded_down_batch_size
+        times_to_round_up_per_task_arr = examples_per_task - (rounded_down_ex_per_task_per_batch * self.num_batches_per_epoch)
+        times_to_round_up_per_task_dict = {self.query_order[i]: times_to_round_up_per_task_arr[i]
+                                           for i in range(times_to_round_up_per_task_arr.shape[0])}
 
-        # move onto the previous tasks
-        prev_task_per_batch = current_task_per_batch // self.current_query_index
-        num_to_round_up = current_task_per_batch % self.current_query_index
-
+        # We now computed how many times we need to round up in each batch, and in each task, and we can use these
+        # two pieces of information to construct batches
         for batch_index in range(self.num_batches_per_epoch):
-            tasks_rounding_up = sorted(self.query_order[:self.current_query_index],
-                                       key=lambda x: len(task_to_images[x]),
-                                       reverse=True)[:num_to_round_up]
+            # Which tasks are we rounding up in this episode?
+            tasks_rounding_up = set(sorted(times_to_round_up_per_task_dict.keys(),
+                                           key=lambda t_id: times_to_round_up_per_task_dict[t_id],
+                                           reverse=True)[:num_to_round_up_per_batch])
 
-            for task in self.query_order[:self.current_query_index]:
-                num_task_examples = prev_task_per_batch + 1 * (task in tasks_rounding_up)
+            # Grab a batch from each
+            for task_idx, task in enumerate(self.query_order[:self.current_query_index + 1]):
+                num_task_examples = rounded_down_ex_per_task_per_batch[task_idx] + (task in tasks_rounding_up)
                 batches[batch_index].extend(list(zip(task_to_images[task][:num_task_examples],
                                                      itertools.cycle([task]))))
                 task_to_images[task] = task_to_images[task][num_task_examples:]
+
+            # Decrement the number of times left to round up
+            for rounded_up_task in tasks_rounding_up:
+                times_to_round_up_per_task_dict[rounded_up_task] -= 1
 
         self.current_epoch_queries = [pair for batch in batches for pair in batch]
 

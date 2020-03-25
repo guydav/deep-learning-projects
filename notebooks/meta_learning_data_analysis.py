@@ -489,9 +489,9 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
     
     for i, run in enumerate(runs):
         if i > 0 and i % 10 == 0:
-            print(run.name, i)
+            print(run.id, run.name, i)
         else:
-            print(run.name)
+            print(run.id, run.name)
         
         if ignore_runs is not None and run.name in ignore_runs:
             continue

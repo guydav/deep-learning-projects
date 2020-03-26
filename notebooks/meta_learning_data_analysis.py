@@ -442,7 +442,17 @@ def query_modulated_runs_by_dimension(max_rep_id):
     return results
 
 
-def epochs_to_taks_completions(runs, name='epochs_to_completion', ignore_runs=None, samples=500, ipb_desc=None):
+def epoch_to_trials(name, episode):
+    if episode == 1 and 'power' not in name.lower():
+        return 22500
+    
+    return 45000
+
+
+def epochs_to_taks_completions(runs, name=None, ignore_runs=None, samples=500, ipb_desc=None):
+    if name is None:
+        name = 'epochs_to_completion'
+        
     results_per_run = []
     
     for run in ipb(runs, desc=ipb_desc):
@@ -470,10 +480,18 @@ def epochs_to_taks_completions(runs, name='epochs_to_completion', ignore_runs=No
                 
             task_finishes.append(current_task_end)
             
+        
         results_per_run.append(task_finishes)
+    
+    results_per_run = np.array(results_per_run)
+    trials_per_epoch = np.array([epoch_to_trials(name, e) for e in np.arange(1, 11)])
+    trials_per_run = results_per_run * trials_per_epoch
 
     return ResultSet(name=name, mean=np.nanmean(results_per_run, axis=0), std=np.nanstd(results_per_run, axis=0)),\
-            ResultSet(name=name, mean=np.nanmean(np.log(results_per_run), axis=0), std=np.nanstd(np.log(results_per_run), axis=0))
+            ResultSet(name=name, mean=np.nanmean(np.log(results_per_run), axis=0), std=np.nanstd(np.log(results_per_run), axis=0)),\
+            ResultSet(name=name, mean=np.nanmean(trials_per_run, axis=0), std=np.nanstd(trials_per_run, axis=0)),\
+            ResultSet(name=name, mean=np.nanmean(np.log(trials_per_run), axis=0), std=np.nanstd(np.log(trials_per_run), axis=0))
+
 
 
 def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTORY_SAMPLES, parse_func=parse_run_results):

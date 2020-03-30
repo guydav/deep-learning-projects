@@ -449,11 +449,12 @@ def epoch_to_trials(name, episode):
     return 45000
 
 
-def epochs_to_taks_completions(runs, name=None, ignore_runs=None, samples=500, ipb_desc=None):
+def epochs_to_task_completions(runs, name=None, ignore_runs=None, samples=500, ipb_desc=None):
     if name is None:
         name = 'epochs_to_completion'
         
     results_per_run = []
+    last_tasks_per_run = []
     
     for run in ipb(runs, desc=ipb_desc):
 #         if i > 0 and i % 10 == 0:
@@ -469,6 +470,7 @@ def epochs_to_taks_completions(runs, name=None, ignore_runs=None, samples=500, i
         first_task_finished = df['Test Accuracy, Query #2'].first_valid_index() - first_row_blank 
         
         task_finishes = [first_task_finished]
+        last_tasks = [1]
         
         for current_task in range(2, 11):
             current_task_start = df[f'Test Accuracy, Query #{current_task}'].first_valid_index()
@@ -480,8 +482,13 @@ def epochs_to_taks_completions(runs, name=None, ignore_runs=None, samples=500, i
                 
             task_finishes.append(current_task_end)
             
+            sub_df = df[[f'Test Accuracy, Query #{i + 1}' for i in range(current_task)]]
+            min_column_name = sub_df.iloc[current_task_end - 2].idxmin()
+            last_task_to_finish = int(min_column_name[min_column_name.find('#') + 1:])
+            last_tasks.append(last_task_to_finish)
         
         results_per_run.append(task_finishes)
+        last_tasks_per_run.append(last_tasks)
     
     results_per_run = np.array(results_per_run)
     trials_per_epoch = np.array([epoch_to_trials(name, e) for e in np.arange(1, 11)])
@@ -490,7 +497,8 @@ def epochs_to_taks_completions(runs, name=None, ignore_runs=None, samples=500, i
     return ResultSet(name=name, mean=np.nanmean(results_per_run, axis=0), std=np.nanstd(results_per_run, axis=0)),\
             ResultSet(name=name, mean=np.nanmean(np.log(results_per_run), axis=0), std=np.nanstd(np.log(results_per_run), axis=0)),\
             ResultSet(name=name, mean=np.nanmean(trials_per_run, axis=0), std=np.nanstd(trials_per_run, axis=0)),\
-            ResultSet(name=name, mean=np.nanmean(np.log(trials_per_run), axis=0), std=np.nanstd(np.log(trials_per_run), axis=0))
+            ResultSet(name=name, mean=np.nanmean(np.log(trials_per_run), axis=0), std=np.nanstd(np.log(trials_per_run), axis=0)),\
+            last_tasks_per_run
 
 
 

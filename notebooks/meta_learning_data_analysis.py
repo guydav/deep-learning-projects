@@ -17,7 +17,7 @@ from collections import namedtuple, defaultdict, OrderedDict
 import json
 from ipypb import ipb
 
-from metalearning import cnnmlp
+# from metalearning import cnnmlp
 
 API = wandb.Api()
 MAX_HISTORY_SAMPLES = 4000
@@ -501,6 +501,15 @@ def epochs_to_task_completions(runs, name=None, ignore_runs=None, samples=500, i
             last_tasks_per_run
 
 
+def kth_diag_indices(a, k):
+    rows, cols = np.diag_indices_from(a)
+    if k < 0:
+        return rows[-k:], cols[:k]
+    elif k > 0:
+        return rows[:-k], cols[k:]
+    else:
+        return rows, cols
+
 
 def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTORY_SAMPLES, parse_func=parse_run_results):
     examples = []
@@ -510,8 +519,9 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
     first_task_accuracies = []
     new_task_accuracies = []
     
-    examples_by_task = np.zeros((30, 10))
-    counts_by_task = np.zeros((30, 10))
+    examples_by_task = np.zeros((30, 10, 10))
+    log_examples_by_task = np.zeros((30, 10, 10))
+    counts_by_task = np.zeros((30, 10, 10))
     
     for i, run in enumerate(runs):
         if i > 0 and i % 10 == 0:
@@ -534,8 +544,12 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
         
         for index, task in enumerate(run.config['query_order']):
             task_examples = np.diag(examples_to_criterion, index)
-            examples_by_task[task,:10 - index] += task_examples
-            counts_by_task[task,:10 - index] += 1
+            diag_r, diag_c = kth_diag_indices(examples_to_criterion, index)
+            # examples_by_task[task,:10 - index] += task_examples
+            # counts_by_task[task,:10 - index] += 1
+            examples_by_task[task, diag_r, diag_c] += task_examples
+            log_examples_by_task[task, diag_r, diag_c] += np.log(task_examples)
+            counts_by_task[task, diag_r, diag_c] += 1
             
     # Removing all extraneous nans
     print('Removing extraneous nans')
@@ -567,7 +581,8 @@ def process_multiple_runs(runs, debug=False, ignore_runs=None, samples=MAX_HISTO
     # to avoid division by zero
     counts_by_task[counts_by_task == 0] = 1
     average_examples_by_task = np.divide(examples_by_task, counts_by_task)
-    output['examples_by_task'] = average_examples_by_task
+    average_log_examples_by_task = np.divide(log_examples_by_task, counts_by_task)
+    output['examples_by_task'] = dict(raw=average_examples_by_task, log=average_log_examples_by_task)
     
     analysis = AnalysisSet(**output)
         
